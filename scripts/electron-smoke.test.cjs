@@ -1225,6 +1225,7 @@ async function verifyG2Workflows(page) {
   await mapDialog.locator(".map-region-drawing-bar").waitFor();
   await mapDialog.getByRole("button", { name: "完成区域绘制", exact: true }).click();
   const holedRegionShape = mapDialog.locator(`.map-region-layer path[data-region-id="${createdRegionId}"]`);
+  await holedRegionShape.waitFor();
   check(await holedRegionShape.count(), 1, "region geometry supports authored interior holes");
   check(await holedRegionShape.getAttribute("fill-rule"), "evenodd", "region holes render as true cutouts instead of overlay shapes");
   await mapDialog.locator(".planning-inspector").evaluate((element) => element.scrollTo({ left: 0, top: 0 }));
