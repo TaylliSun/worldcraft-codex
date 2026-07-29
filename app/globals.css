@@ -17969,6 +17969,29 @@ button {
   visibility: hidden;
 }
 
+.map-planning-viewport.is-region-drawing :where(
+  .map-layer-image-hit-target,
+  .map-region-label,
+  .map-region-vertex,
+  .map-region-midpoint,
+  .planning-map-marker,
+  .map-marker-label,
+  .map-marker-cluster,
+  .map-route-stop-node,
+  .map-route-waypoint,
+  .map-minimap
+) {
+  pointer-events: none;
+}
+
+.map-planning-viewport.is-region-drawing :where(
+  .map-region-label,
+  .map-marker-label,
+  .map-minimap
+) {
+  opacity: 0.55;
+}
+
 .map-minimap > img {
   height: 100%;
   object-fit: contain;

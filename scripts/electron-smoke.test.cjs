@@ -1208,17 +1208,19 @@ async function verifyG2Workflows(page) {
     "region layer order can be changed from the inspector"
   );
   await mapDialog.getByRole("button", { name: "绘制镂空", exact: true }).click();
-  const holeStageBox = await mapStage.boundingBox();
-  if (holeStageBox) {
-    const holePoints = [
-      [0.66, 0.73],
-      [0.75, 0.73],
-      [0.75, 0.82],
-      [0.66, 0.82]
-    ];
-    for (const [x, y] of holePoints) {
-      await page.mouse.click(holeStageBox.x + holeStageBox.width * x, holeStageBox.y + holeStageBox.height * y);
-    }
+  const holeTargetBox = await selectedRegionPolygon.boundingBox();
+  if (!holeTargetBox) throw new Error("selected region is not visible for hole drawing");
+  const holePoints = [
+    [0.35, 0.35],
+    [0.65, 0.35],
+    [0.65, 0.65],
+    [0.35, 0.65]
+  ];
+  for (const [x, y] of holePoints) {
+    await page.mouse.click(
+      holeTargetBox.x + holeTargetBox.width * x,
+      holeTargetBox.y + holeTargetBox.height * y
+    );
   }
   await mapDialog.locator(".map-region-drawing-bar").waitFor();
   await mapDialog.getByRole("button", { name: "完成区域绘制", exact: true }).click();
