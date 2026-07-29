@@ -5580,6 +5580,10 @@ body.quest-visual-fullscreen-open {
     width: 318px;
     z-index: 65;
   }
+
+  .codex-grid.has-inspector .codex-editor-contextbar {
+    padding-right: 330px;
+  }
 }
 
 @media (max-width: 900px) {

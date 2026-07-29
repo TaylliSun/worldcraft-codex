@@ -355,6 +355,35 @@ function check(actual, expected, message) {
   assertions += 1;
 }
 
+async function inspectHitTarget(locator, obstructionSelector = "") {
+  return locator.evaluate((element, selector) => {
+    const bounds = element.getBoundingClientRect();
+    const hitTarget = document.elementFromPoint(
+      bounds.left + bounds.width / 2,
+      bounds.top + bounds.height / 2
+    );
+    const obstruction = selector ? document.querySelector(selector) : null;
+    const obstructionBounds = obstruction?.getBoundingClientRect();
+    return {
+      button: {
+        bottom: Math.round(bounds.bottom),
+        left: Math.round(bounds.left),
+        right: Math.round(bounds.right),
+        top: Math.round(bounds.top)
+      },
+      clickable: hitTarget === element || element.contains(hitTarget),
+      hitClass: hitTarget instanceof HTMLElement ? hitTarget.className : "",
+      hitTag: hitTarget?.tagName ?? "",
+      obstruction: obstructionBounds ? {
+        bottom: Math.round(obstructionBounds.bottom),
+        left: Math.round(obstructionBounds.left),
+        right: Math.round(obstructionBounds.right),
+        top: Math.round(obstructionBounds.top)
+      } : null
+    };
+  }, obstructionSelector);
+}
+
 async function launch() {
   const env = {
     ...process.env,
@@ -2379,7 +2408,17 @@ async function quitAndWait(electronApp, timeout = 30000) {
     });
     await impactDialog.getByRole("button", { name: "关闭变更影响", exact: true }).click();
     check(await impactDialog.count(), 0, "change impact closes back into the current entity editor");
-    await page.getByRole("button", { name: "关闭条目检查", exact: true }).click();
+    const closeInspectorButton = page.getByRole("button", { name: "关闭条目检查", exact: true });
+    const inspectorCloseHitTest = await inspectHitTarget(
+      closeInspectorButton,
+      ".codex-grid > .inspector-stack"
+    );
+    check(
+      inspectorCloseHitTest.clickable,
+      true,
+      `responsive inspector leaves its close control clickable (${JSON.stringify(inspectorCloseHitTest)})`
+    );
+    await closeInspectorButton.click();
     await verifyKeyboardAndIme(page);
 
     await verifyG2Workflows(page);
@@ -3645,6 +3684,18 @@ async function quitAndWait(electronApp, timeout = 30000) {
     await waitForWorkspace(page);
     await openWorkspace(page, "知识库");
     check(await page.locator(".entity-browser").count(), 0, "narrow startup opens the selected entry instead of covering it with the library");
+    await page.getByRole("button", { name: "打开条目检查", exact: true }).click();
+    const narrowInspectorClose = page.getByRole("button", { name: "关闭条目检查", exact: true });
+    const narrowInspectorHitTest = await inspectHitTarget(
+      narrowInspectorClose,
+      ".codex-grid > .inspector-stack"
+    );
+    check(
+      narrowInspectorHitTest.clickable,
+      true,
+      `narrow inspector keeps its close control above the drawer (${JSON.stringify(narrowInspectorHitTest)})`
+    );
+    await narrowInspectorClose.click();
     await page.screenshot({
       path: path.join(root, "validation", "g8-codex-narrow.png"),
       fullPage: false

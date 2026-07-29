@@ -2,7 +2,7 @@
 
 Worldcraft Codex 是一款本地优先的 Windows 世界观与叙事开发软件。它把世界 Wiki、设定条目、长篇小说、任务线、分支剧情、互动地图、关系图谱、时间线、资源库和可连接第三方模型的 AI 写作工具放在同一个桌面工程里。
 
-> 当前版本：`2.2.0-rc.21` 展演候选版。候选安装包尚未进行 Authenticode 代码签名，不应冒充正式稳定版。
+> 当前版本：`2.2.0-rc.22` 展演候选版。候选安装包尚未进行 Authenticode 代码签名，不应冒充正式稳定版。
 
 ![Worldcraft Codex 作者工作台](docs/images/author-workspace.png)
 
@@ -75,7 +75,7 @@ npm run test:portable-package
 - [备份与恢复](docs/BACKUP_AND_RECOVERY.md)
 - [已知限制](docs/KNOWN_LIMITATIONS.md)
 - [安全策略](SECURITY.md)
-- [候选版发行说明](docs/RELEASE_NOTES_2.2.0-rc.21.md)
+- [候选版发行说明](docs/RELEASE_NOTES_2.2.0-rc.22.md)
 
 ## 案例内容
 
