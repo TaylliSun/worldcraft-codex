@@ -406,7 +406,7 @@ async function launch() {
 }
 
 async function waitForWorkspace(page) {
-  await page.getByLabel("世界名称").waitFor({ state: "visible", timeout: 30000 });
+  await page.getByLabel("世界名称", { exact: true }).waitFor({ state: "visible", timeout: 30000 });
   await page.waitForFunction(() =>
     Boolean(document.querySelector("[role='dialog'][aria-label='选择项目起步包']")) ||
     Boolean(document.querySelector(".compact-save-status")?.textContent.includes("SQLite"))
@@ -2350,7 +2350,7 @@ async function quitAndWait(electronApp, timeout = 30000) {
     const aiAddress = aiServer.address();
     ({ electronApp: app, page } = await launch());
     await waitForWorkspace(page);
-    check(await page.getByLabel("世界名称").inputValue(), "苍岚纪", "fresh start loads sample world");
+    check(await page.getByLabel("世界名称", { exact: true }).inputValue(), "苍岚纪", "fresh start loads sample world");
     await page.locator(".author-workspace").waitFor();
     check(await page.getByText("作者工作台", { exact: true }).count() > 0, true, "fresh start opens the author cockpit");
     check(await page.locator(".author-current-writing").count(), 1, "author cockpit offers a direct continue-writing target");
