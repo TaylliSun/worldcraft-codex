@@ -9,6 +9,8 @@
   "private": true,
   "main": "electron/main.cjs",
   "scripts": {
+    "native:rebuild": "electron-builder install-app-deps",
+    "postinstall": "npm run native:rebuild",
     "dev": "next dev",
     "desktop": "electron .",
     "desktop:dev": "set ELECTRON_START_URL=http://localhost:3000&& electron .",
