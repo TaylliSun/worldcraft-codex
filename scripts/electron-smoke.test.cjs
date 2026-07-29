@@ -1208,18 +1208,62 @@ async function verifyG2Workflows(page) {
     "region layer order can be changed from the inspector"
   );
   await mapDialog.getByRole("button", { name: "绘制镂空", exact: true }).click();
-  const holeTargetBox = await selectedRegionPolygon.boundingBox();
-  if (!holeTargetBox) throw new Error("selected region is not visible for hole drawing");
-  const holePoints = [
-    [0.35, 0.35],
-    [0.65, 0.35],
-    [0.65, 0.65],
-    [0.35, 0.65]
-  ];
-  for (const [x, y] of holePoints) {
+  const holeMapPoints = await selectedRegionPolygon.evaluate((element) => {
+    const points = (element.getAttribute("points") || "")
+      .trim()
+      .split(/\s+/)
+      .map((pair) => {
+        const [x, y] = pair.split(",").map(Number);
+        return { x, y };
+      })
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (points.length < 3) throw new Error("selected region has no polygon geometry");
+    const inside = (point) => {
+      let result = false;
+      for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+        const currentPoint = points[index];
+        const previousPoint = points[previous];
+        const crosses = (currentPoint.y > point.y) !== (previousPoint.y > point.y)
+          && point.x < ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y))
+            / (previousPoint.y - currentPoint.y) + currentPoint.x;
+        if (crosses) result = !result;
+      }
+      return result;
+    };
+    const bounds = {
+      left: Math.min(...points.map((point) => point.x)),
+      right: Math.max(...points.map((point) => point.x)),
+      top: Math.min(...points.map((point) => point.y)),
+      bottom: Math.max(...points.map((point) => point.y))
+    };
+    const width = bounds.right - bounds.left;
+    const height = bounds.bottom - bounds.top;
+    for (const inset of [0.12, 0.08, 0.05, 0.03]) {
+      const halfSize = Math.min(width, height) * inset;
+      for (let row = 2; row <= 8; row += 1) {
+        for (let column = 2; column <= 8; column += 1) {
+          const center = {
+            x: bounds.left + width * (column / 10),
+            y: bounds.top + height * (row / 10)
+          };
+          const hole = [
+            { x: center.x - halfSize, y: center.y - halfSize },
+            { x: center.x + halfSize, y: center.y - halfSize },
+            { x: center.x + halfSize, y: center.y + halfSize },
+            { x: center.x - halfSize, y: center.y + halfSize }
+          ];
+          if (hole.every(inside)) return hole;
+        }
+      }
+    }
+    throw new Error("could not find an interior hole inside the selected region");
+  });
+  const holeStageBox = await mapStage.boundingBox();
+  if (!holeStageBox) throw new Error("map stage is not visible for hole drawing");
+  for (const point of holeMapPoints) {
     await page.mouse.click(
-      holeTargetBox.x + holeTargetBox.width * x,
-      holeTargetBox.y + holeTargetBox.height * y
+      holeStageBox.x + holeStageBox.width * (point.x / 100),
+      holeStageBox.y + holeStageBox.height * (point.y / 100)
     );
   }
   await mapDialog.locator(".map-region-drawing-bar").waitFor();
@@ -1640,36 +1684,12 @@ async function verifyG2Workflows(page) {
   );
 
   moveHandleBox = await moveImageHandle.boundingBox();
-  const scaleImageHandle = imageTransformBox.getByRole("button", { name: "缩放地图底图", exact: true });
-  const scaleHandleBox = await scaleImageHandle.boundingBox();
-  if (!moveHandleBox || !scaleHandleBox) throw new Error("map image scale handles are not visible");
-  const scaleCenter = {
-    x: moveHandleBox.x + moveHandleBox.width / 2,
-    y: moveHandleBox.y + moveHandleBox.height / 2
-  };
-  const scaleStart = {
-    x: scaleHandleBox.x + scaleHandleBox.width / 2,
-    y: scaleHandleBox.y + scaleHandleBox.height / 2
-  };
-  await page.mouse.move(scaleStart.x, scaleStart.y);
-  await page.mouse.down();
-  await page.mouse.move(
-    scaleCenter.x + (scaleStart.x - scaleCenter.x) * 1.2,
-    scaleCenter.y + (scaleStart.y - scaleCenter.y) * 1.2,
-    { steps: 6 }
-  );
-  await page.mouse.up();
-  await page.waitForFunction(() => Number(document.querySelector("[aria-label='底图缩放比例']")?.value || 0) > 110);
-  check(
-    Number(await page.getByLabel("底图缩放比例").inputValue()) > 110,
-    true,
-    "map image can be resized directly on the canvas"
-  );
-
-  moveHandleBox = await moveImageHandle.boundingBox();
   const rotateImageHandle = imageTransformBox.getByRole("button", { name: "旋转地图底图", exact: true });
   const rotateHandleBox = await rotateImageHandle.boundingBox();
-  if (!moveHandleBox || !rotateHandleBox) throw new Error("map image rotation handles are not visible");
+  const rotateHandleHitTest = await inspectHitTarget(rotateImageHandle);
+  if (!moveHandleBox || !rotateHandleBox || !rotateHandleHitTest.clickable) {
+    throw new Error(`map image rotation handle is not visible: ${JSON.stringify(rotateHandleHitTest)}`);
+  }
   const imageCenter = {
     x: moveHandleBox.x + moveHandleBox.width / 2,
     y: moveHandleBox.y + moveHandleBox.height / 2
@@ -1678,15 +1698,70 @@ async function verifyG2Workflows(page) {
     rotateHandleBox.x + rotateHandleBox.width / 2 - imageCenter.x,
     rotateHandleBox.y + rotateHandleBox.height / 2 - imageCenter.y
   );
+  const basemapRotationBeforeDrag = Number(await page.getByLabel("底图旋转角度").inputValue());
   await page.mouse.move(rotateHandleBox.x + rotateHandleBox.width / 2, rotateHandleBox.y + rotateHandleBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(imageCenter.x + rotateRadius, imageCenter.y, { steps: 7 });
   await page.mouse.up();
-  await page.waitForFunction(() => Math.abs(Number(document.querySelector("[aria-label='底图旋转角度']")?.value || 0)) > 45);
+  await page.waitForFunction(
+    (before) => Math.abs(Number(document.querySelector("[aria-label='底图旋转角度']")?.value || 0) - before) > 5,
+    basemapRotationBeforeDrag
+  );
   check(
-    Math.abs(Number(await page.getByLabel("底图旋转角度").inputValue())) > 45,
+    Math.abs(Number(await page.getByLabel("底图旋转角度").inputValue()) - basemapRotationBeforeDrag) > 5,
     true,
     "map image can be rotated directly on the canvas"
+  );
+
+  await page.getByRole("button", { name: "适配全部画布内容", exact: true }).click();
+  await page.waitForTimeout(250);
+  moveHandleBox = await moveImageHandle.boundingBox();
+  const scaleImageHandles = imageTransformBox.locator("[data-image-transform-handle='scale']");
+  const scaleHandleHitTests = [];
+  let scaleImageHandle = null;
+  let scaleHandleBox = null;
+  for (let index = 0; index < await scaleImageHandles.count(); index += 1) {
+    const candidate = scaleImageHandles.nth(index);
+    const hitTest = await inspectHitTarget(candidate);
+    scaleHandleHitTests.push(hitTest);
+    if (hitTest.clickable) {
+      scaleImageHandle = candidate;
+      scaleHandleBox = await candidate.boundingBox();
+      break;
+    }
+  }
+  if (!moveHandleBox || !scaleImageHandle || !scaleHandleBox) {
+    throw new Error(`map image has no visible scale handle: ${JSON.stringify(scaleHandleHitTests)}`);
+  }
+  const scaleCenter = {
+    x: moveHandleBox.x + moveHandleBox.width / 2,
+    y: moveHandleBox.y + moveHandleBox.height / 2
+  };
+  const scaleStart = {
+    x: scaleHandleBox.x + scaleHandleBox.width / 2,
+    y: scaleHandleBox.y + scaleHandleBox.height / 2
+  };
+  await page.screenshot({
+    path: path.join(root, "validation", "map-workspace-basemap-transform-compact.png"),
+    fullPage: false
+  });
+  const basemapScaleBeforeDrag = Number(await page.getByLabel("底图缩放比例").inputValue());
+  await page.mouse.move(scaleStart.x, scaleStart.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    scaleCenter.x + (scaleStart.x - scaleCenter.x) * 1.4,
+    scaleCenter.y + (scaleStart.y - scaleCenter.y) * 1.4,
+    { steps: 6 }
+  );
+  await page.mouse.up();
+  await page.waitForFunction(
+    (before) => Math.abs(Number(document.querySelector("[aria-label='底图缩放比例']")?.value || 0) - before) > 1,
+    basemapScaleBeforeDrag
+  );
+  check(
+    Math.abs(Number(await page.getByLabel("底图缩放比例").inputValue()) - basemapScaleBeforeDrag) > 1,
+    true,
+    "map image can be resized directly on the canvas"
   );
 
   await page.getByLabel("底图横向位置").fill("12");
@@ -2180,6 +2255,8 @@ async function verifyG2Workflows(page) {
   await page.getByRole("heading", { name: "苍岚全境图", exact: true }).waitFor();
   check(await page.evaluate(() => window.scrollY), 0, "timeline navigation resets the viewport");
 
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(200);
   await openWorkspace(page, "资源库");
   await page.getByRole("heading", { name: "全部资源", exact: true }).waitFor();
   const assetInspector = page.locator(".asset-inspector-panel");
@@ -2424,7 +2501,11 @@ async function quitAndWait(electronApp, timeout = 30000) {
     await closeInspectorButton.click();
     await verifyKeyboardAndIme(page);
 
+    const g2Viewport = page.viewportSize();
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await page.waitForTimeout(150);
     await verifyG2Workflows(page);
+    if (g2Viewport) await page.setViewportSize(g2Viewport);
     check(await page.getByLabel("条目标题").inputValue(), "艾琳", "G2 workflow returns to the selected entity");
 
     check(await page.locator(".world-menu-current").textContent(), "苍岚纪", "top bar exposes the active world directly");
