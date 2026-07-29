@@ -1,0 +1,94 @@
+name: Windows signed public release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing v<package version> tag
+        required: true
+        type: string
+      channel:
+        description: Release channel
+        required: true
+        default: candidate
+        type: choice
+        options: [candidate, stable]
+
+permissions:
+  contents: write
+
+jobs:
+  signed-release:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    environment: windows-public-release
+    env:
+      WORLDCRAFT_PUBLISHER_NAME: ${{ vars.WORLDCRAFT_PUBLISHER_NAME }}
+      WORLDCRAFT_LEGAL_NAME: ${{ vars.WORLDCRAFT_LEGAL_NAME }}
+      WORLDCRAFT_CERTIFICATE_PUBLISHER: ${{ vars.WORLDCRAFT_CERTIFICATE_PUBLISHER }}
+      WORLDCRAFT_HOMEPAGE: ${{ vars.WORLDCRAFT_HOMEPAGE }}
+      WORLDCRAFT_SUPPORT_URL: ${{ vars.WORLDCRAFT_SUPPORT_URL }}
+      WORLDCRAFT_PRIVACY_URL: ${{ vars.WORLDCRAFT_PRIVACY_URL }}
+      WORLDCRAFT_TERMS_URL: ${{ vars.WORLDCRAFT_TERMS_URL }}
+      WORLDCRAFT_UPDATE_STABLE_URL: ${{ vars.WORLDCRAFT_UPDATE_STABLE_URL }}
+      WORLDCRAFT_UPDATE_CANDIDATE_URL: ${{ vars.WORLDCRAFT_UPDATE_CANDIDATE_URL }}
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Validate tag and channel
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.release_tag }}"
+          $channel = "${{ inputs.channel }}"
+          $version = node -p "require('./package.json').version"
+          if ($tag -ne "v$version") { throw "Tag $tag does not match package version v$version" }
+          git rev-parse --verify "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { throw "Tag $tag must already exist" }
+          "WORLDCRAFT_RELEASE_CHANNEL=$channel" >> $env:GITHUB_ENV
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "SOURCE_DATE_EPOCH=$(git show -s --format=%ct $tag)" >> $env:GITHUB_ENV
+      - run: npm ci
+      - run: npm run release:gate
+      - run: npm run dist:public
+      - run: npm run test:project-package-packaged
+      - run: npm run test:installer-package
+      - run: npm run test:portable-package
+      - run: npm run test:upgrade-install
+      - uses: actions/upload-artifact@v4
+        with:
+          name: worldcraft-codex-${{ inputs.release_tag }}-windows
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+            release/*manifest.json
+            release/*provenance.json
+            release/*sbom.cdx.json
+            release/SHA256SUMS.txt
+            build/generated/THIRD_PARTY_NOTICES.txt
+            build/generated/third-party-inventory.json
+            validation/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Create or update draft release
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem release -File | Where-Object { $_.Name -match '\.(exe|blockmap|yml|json|txt)$' } | ForEach-Object { $_.FullName }
+          $version = (node -p "require('./package.json').version").Trim()
+          $notes = "docs/RELEASE_NOTES_$version.md"
+          $isDraft = gh release view $env:RELEASE_TAG --json isDraft --jq .isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if ($isDraft -ne "true") { throw "Existing release must remain a draft during automated upload" }
+            gh release upload $env:RELEASE_TAG $files --clobber
+          } else {
+            gh release create $env:RELEASE_TAG $files --verify-tag --draft --title "Worldcraft Codex $env:RELEASE_TAG" --notes-file $notes
+          }

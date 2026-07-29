@@ -1,0 +1,32 @@
+name: Windows quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run release:gate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-quality-reports
+          path: validation/
+          if-no-files-found: warn
+          retention-days: 14
