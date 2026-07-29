@@ -40,10 +40,10 @@
 
 ## Windows 产物
 
-- `Worldcraft Codex-Setup-2.2.0-rc.22.exe`：128.83 MiB
-  SHA-256 `140e92c684169c6ebb7759bc38b82f8330918be6e90d12ab82539dc126570f90`
-- `Worldcraft Codex-Portable-2.2.0-rc.22.exe`：128.66 MiB
-  SHA-256 `ac4e2cc45d1873a814cbbad3d806ed69f4bf4070cf0df05607bd67a1c3a9a8b3`
+- `Worldcraft Codex-Setup-2.2.0-rc.22.exe`：128.84 MiB
+  SHA-256 `d560389364103c650285dc68c45711325315428211ed369736c42d8a653542db`
+- `Worldcraft Codex-Portable-2.2.0-rc.22.exe`：128.67 MiB
+  SHA-256 `7d0e4a285e548a86f2b186dcd68534447ae81be33bd2263910578854efb62338`
 
 Release 同时附带 `SHA256SUMS.txt`、CycloneDX SBOM、构建来源证明、产物清单和第三方依赖清单。
 
