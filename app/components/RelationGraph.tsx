@@ -449,23 +449,28 @@ export function RelationGraph({
   const previousViewModeRef = useRef<RelationGraphViewMode>(viewMode);
   const markerPrefix = `relation-${useId().replaceAll(":", "")}`;
   const focusedEntity = entities.find((entity) => entity.id === focusedEntityId) ?? null;
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
 
   const relationCountByEntity = useMemo(() => {
     const counts = new Map<string, number>();
+    if (viewMode === "all" && !normalizedQuery) return counts;
     relations.forEach((relation) => {
       counts.set(relation.sourceEntityId, (counts.get(relation.sourceEntityId) ?? 0) + 1);
       counts.set(relation.targetEntityId, (counts.get(relation.targetEntityId) ?? 0) + 1);
     });
     return counts;
-  }, [relations]);
+  }, [normalizedQuery, relations, viewMode]);
 
   const activeRelations = useMemo(
-    () => relations.filter((relation) => !hiddenKinds.has(relation.kind)),
+    () => hiddenKinds.size
+      ? relations.filter((relation) => !hiddenKinds.has(relation.kind))
+      : relations,
     [hiddenKinds, relations]
   );
 
   const relationDegreeByEntity = useMemo(() => {
     const degrees = new Map<string, number>();
+    if (viewMode !== "focus" && laneScope !== "context") return degrees;
     const entityIds = new Set(entities.map((entity) => entity.id));
     if (!focusedEntityId || !entityIds.has(focusedEntityId)) return degrees;
     const neighborsByEntity = new Map<string, Set<string>>();
@@ -496,7 +501,7 @@ export function RelationGraph({
       });
     }
     return degrees;
-  }, [activeRelations, entities, focusedEntityId]);
+  }, [activeRelations, entities, focusedEntityId, laneScope, viewMode]);
 
   const directStrengthByEntity = useMemo(() => {
     const strengths = new Map<string, number>();
@@ -515,6 +520,7 @@ export function RelationGraph({
   }, [activeRelations, focusedEntityId]);
 
   const displayedEntities = useMemo(() => {
+    if (viewMode === "all") return [];
     if (viewMode !== "focus" || !focusedEntityId) return entities;
     return entities.filter(
       (entity) =>
@@ -611,6 +617,21 @@ export function RelationGraph({
   }, [displayedRelations, focusedEntityId]);
 
   const graph = useMemo(() => {
+    if (viewMode === "all") {
+      return {
+        gapX: 0,
+        grouped: [],
+        height: 0,
+        layout: "network" as const,
+        networkClusters: [],
+        nodeHeight: 0,
+        nodeWidth: 0,
+        orbitCenter: null,
+        orbitRings: [],
+        positions: new Map<string, { x: number; y: number; type: RelationGraphEntityType }>(),
+        width: 0
+      };
+    }
     const orbitLayout = viewMode === "focus" && Boolean(focusedEntityId);
     const nodeWidth = orbitLayout ? 96 : 132;
     const nodeHeight = orbitLayout ? 96 : 58;
@@ -897,7 +918,6 @@ export function RelationGraph({
     viewMode
   ]);
 
-  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
     return entities

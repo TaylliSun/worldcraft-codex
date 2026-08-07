@@ -496,7 +496,7 @@ const workspaceTabLabels: Record<WorkspaceTab, string> = {
   templates: "模板",
   production: "制作",
   testing: "测试",
-  relations: "关系图",
+  relations: "关系图谱",
   assets: "资源库",
   map: "地图",
   timeline: "时间线",
@@ -6485,11 +6485,16 @@ export default function Home() {
     [relationVisibleIds, worldRelations]
   );
 
+  const relationEntityById = useMemo(
+    () => new globalThis.Map(worldEntities.map((entity) => [entity.id, entity])),
+    [worldEntities]
+  );
+
   const filteredRelations = useMemo(() => {
     const normalizedQuery = normalize(relationQuery);
     return worldRelations.filter((relation) => {
-      const source = worldEntities.find((entity) => entity.id === relation.sourceEntityId);
-      const target = worldEntities.find((entity) => entity.id === relation.targetEntityId);
+      const source = relationEntityById.get(relation.sourceEntityId);
+      const target = relationEntityById.get(relation.targetEntityId);
       const matchesType =
         relationTypeFilter === "all" ||
         source?.type === relationTypeFilter ||
@@ -6510,7 +6515,12 @@ export default function Home() {
         ).includes(normalizedQuery);
       return matchesType && matchesQuery;
     });
-  }, [relationQuery, relationTypeFilter, worldEntities, worldRelations]);
+  }, [relationEntityById, relationQuery, relationTypeFilter, worldRelations]);
+
+  const renderedRelations = useMemo(
+    () => filteredRelations.slice(0, 160),
+    [filteredRelations]
+  );
 
   const focusedRelationEntity = useMemo(
     () =>
@@ -14448,6 +14458,12 @@ export default function Home() {
             onClick={() => setActiveTab("story")}
           />
           <TabButton
+            active={activeTab === "relations"}
+            icon={Network}
+            label="关系图谱"
+            onClick={() => setActiveTab("relations")}
+          />
+          <TabButton
             active={activeTab === "map"}
             icon={Map}
             label="地图"
@@ -15709,13 +15725,9 @@ export default function Home() {
 
               <div className="explicit-relation-list">
                 {filteredRelations.length ? (
-                  filteredRelations.map((relation) => {
-                    const source = worldEntities.find(
-                      (entity) => entity.id === relation.sourceEntityId
-                    );
-                    const target = worldEntities.find(
-                      (entity) => entity.id === relation.targetEntityId
-                    );
+                  renderedRelations.map((relation) => {
+                    const source = relationEntityById.get(relation.sourceEntityId);
+                    const target = relationEntityById.get(relation.targetEntityId);
                     const DirectionIcon =
                       relation.direction === "directed" ? ArrowRight : ArrowLeftRight;
                     return (
@@ -15742,6 +15754,11 @@ export default function Home() {
                 ) : (
                   <p className="relation-list-empty">当前没有符合条件的关系</p>
                 )}
+                {filteredRelations.length > renderedRelations.length ? (
+                  <p className="relation-list-limit">
+                    首屏显示 {renderedRelations.length} 条，共 {filteredRelations.length} 条。输入名称可检索全部关系。
+                  </p>
+                ) : null}
               </div>
             </div>
 

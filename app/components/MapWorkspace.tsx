@@ -4992,7 +4992,8 @@ export function MapWorkspace({
             onPointerUp={stopViewportPanning}
           >
             <div
-              className={`map-planning-stage ${placing ? "is-placing" : ""} ${canvasTool === "region" ? "is-region-drawing" : ""} ${canvasTool === "measure" ? "is-measuring" : ""}`}
+              aria-label="地图坐标空间，中心原点为 0,0"
+              className={`map-planning-stage is-unbounded ${placing ? "is-placing" : ""} ${canvasTool === "region" ? "is-region-drawing" : ""} ${canvasTool === "measure" ? "is-measuring" : ""}`}
               ref={stageRef}
               style={{
                 height: activeMap.height * zoom,
@@ -5017,9 +5018,11 @@ export function MapWorkspace({
               )}
               onLoad={(event) => rememberMapImageNaturalSize(activeMap.imageUrl, event.currentTarget)}
             />
-          ) : (
-            <div className="generated-map" aria-label="空白地图画布" />
-          )}
+          ) : null}
+          <div aria-hidden="true" className="map-canvas-origin">
+            <span />
+            <small>0,0</small>
+          </div>
           {activeLayers
             .filter(
               (layer) => layer.visible

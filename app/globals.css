@@ -15837,10 +15837,10 @@ button {
 }
 
 .map-planning-stage {
-  background: #dce6df;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   isolation: isolate;
   left: 0;
   min-height: 0;
@@ -15852,7 +15852,7 @@ button {
 }
 
 .map-basemap-surface {
-  border-radius: inherit;
+  border-radius: 0;
   inset: 0;
   overflow: visible;
   position: absolute;
@@ -15860,8 +15860,63 @@ button {
 
 .map-planning-stage.is-placing {
   cursor: crosshair;
-  outline: 3px solid rgba(15, 118, 110, 0.24);
-  outline-offset: -4px;
+}
+
+.map-canvas-origin {
+  align-items: center;
+  display: flex;
+  height: 1px;
+  justify-content: center;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  z-index: 11;
+}
+
+.map-canvas-origin > span {
+  background: var(--theme-accent, #5fc6a1);
+  border: 2px solid color-mix(in srgb, var(--theme-panel, #fff) 88%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--theme-accent, #5fc6a1) 75%, #102019),
+    0 0 0 7px color-mix(in srgb, var(--theme-accent, #5fc6a1) 14%, transparent);
+  height: 8px;
+  position: absolute;
+  width: 8px;
+}
+
+.map-canvas-origin::before,
+.map-canvas-origin::after {
+  background: color-mix(in srgb, var(--theme-accent, #5fc6a1) 64%, transparent);
+  content: "";
+  position: absolute;
+}
+
+.map-canvas-origin::before {
+  height: 1px;
+  width: 34px;
+}
+
+.map-canvas-origin::after {
+  height: 34px;
+  width: 1px;
+}
+
+.map-canvas-origin > small {
+  background: color-mix(in srgb, var(--theme-panel, #fff) 88%, transparent);
+  border: 1px solid var(--theme-line-strong, #435149);
+  border-radius: 4px;
+  color: var(--theme-muted, #a0ada7);
+  font-size: 9px;
+  font-weight: 800;
+  left: 12px;
+  line-height: 18px;
+  padding: 0 5px;
+  position: absolute;
+  top: 10px;
+  white-space: nowrap;
 }
 
 .map-basemap-surface > .generated-map {
@@ -25452,4 +25507,419 @@ body.map-focus-open {
 .app-shell.is-viewport-contained .story-workspace .manuscript-shell {
   height: auto;
   min-height: 0;
+}
+
+/* Keep legacy planning surfaces aligned with every application theme. */
+.app-shell[data-theme] :where(
+  .quest-workspace-toolbar,
+  .quest-picker,
+  .quest-related-strip,
+  .quest-flow,
+  .quest-prerequisite-strip,
+  .participation-panel,
+  .relation-graph-search,
+  .relation-view-toggle,
+  .relation-graph-scope,
+  .relation-graph-controls,
+  .relation-atlas-scroll,
+  .relation-atlas-heading,
+  .planning-mode-switch,
+  .planning-toolbar,
+  .planning-browser,
+  .planning-inspector,
+  .map-canvas-toolbar
+) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(
+  .quest-category-filter button,
+  .quest-card,
+  .chip-grid button,
+  .branch-main-node small,
+  .relation-view-toggle,
+  .relation-graph-controls,
+  .planning-mode-switch,
+  .relation-atlas-row
+) {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] :where(
+  .quest-category-filter button.is-active,
+  .participation-toolbar button.is-active,
+  .quest-card.is-active,
+  .chip-grid button.is-active,
+  .relation-view-toggle button.is-active,
+  .relation-graph-controls button.is-active,
+  .planning-mode-switch button.is-active
+) {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 42%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] :where(.subsection-title, .branch-main-node strong,
+  .relation-atlas-core strong, .relation-atlas-stats dd) {
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.branch-root, .branch-end) {
+  background: color-mix(in srgb, var(--amber) 12%, var(--theme-panel));
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--theme-line));
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .branch-main-node {
+  background: var(--theme-panel);
+  border-color: color-mix(in srgb, var(--theme-accent) 66%, var(--theme-line));
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .branch-outcome {
+  background: color-mix(in srgb, var(--violet) 10%, var(--theme-panel));
+  border-color: color-mix(in srgb, var(--violet) 34%, var(--theme-line));
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .branch-failure {
+  background: color-mix(in srgb, var(--coral) 9%, var(--theme-panel));
+  border-color: color-mix(in srgb, var(--coral) 34%, var(--theme-line));
+}
+
+.app-shell[data-theme] :where(.branch-trunk, .branch-stage-grid::before) {
+  background: var(--theme-line-strong);
+}
+
+.app-shell[data-theme] .branch-trunk::after {
+  border-top-color: var(--theme-line-strong);
+}
+
+.app-shell[data-theme] :where(.dependency-scroll, .relation-graph-scroll,
+  .relation-graph-scroll.is-network-view) {
+  background-color: var(--theme-panel-soft);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--theme-line) 58%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-line) 58%, transparent) 1px, transparent 1px);
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(
+  .dependency-node.category-main,
+  .dependency-node.category-side,
+  .dependency-node.category-character
+) {
+  background: var(--theme-panel) !important;
+  color: var(--theme-ink) !important;
+}
+
+.app-shell[data-theme] :where(.relation-graph-search-results,
+  .relation-atlas-heading, .relation-atlas-row) {
+  background-color: var(--theme-panel);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.relation-type-filter button.is-active,
+  .explicit-relation-card.is-active) {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 42%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .generate-relations-button {
+  background: color-mix(in srgb, var(--violet) 12%, var(--theme-panel));
+  border-color: color-mix(in srgb, var(--violet) 34%, var(--theme-line));
+}
+
+.app-shell[data-theme] .relation-atlas-relation {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(.relation-atlas-relation:hover,
+  .relation-atlas-relation:focus-visible) {
+  background: var(--theme-selected);
+}
+
+.app-shell[data-theme] :where(.relation-atlas-entity:hover,
+  .relation-atlas-entity:focus-visible, .relation-atlas-entity.is-core) {
+  background: color-mix(in srgb, var(--relation-entity-color) 10%, var(--theme-panel));
+}
+
+.app-shell[data-theme] :where(.relation-graph-search-results button:hover,
+  .relation-graph-search-results button:focus-visible,
+  .relation-graph-controls button:hover:not(:disabled),
+  .relation-atlas-entity:hover,
+  .relation-atlas-entity:focus-visible,
+  .relation-atlas-entity.is-core) {
+  background: var(--theme-selected);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .map-planning-viewport {
+  background-color: color-mix(in srgb, var(--theme-rail) 84%, var(--theme-bg));
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--theme-line-strong) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme-line-strong) 28%, transparent) 1px, transparent 1px);
+  border-color: var(--theme-line-strong);
+}
+
+.app-shell[data-theme] :where(.map-canvas-toolbar button,
+  .map-image-empty-action, .map-view-bookmark-popover,
+  .map-view-bookmark-popover button) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line);
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] :where(.map-canvas-toolbar button:hover:not(:disabled),
+  .map-canvas-toolbar button.is-active, .map-image-empty-action:hover) {
+  background: var(--theme-selected);
+  border-color: var(--theme-accent);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .planning-item-list > button:hover,
+.app-shell[data-theme] .planning-item-list > button.is-active,
+.app-shell[data-theme] .planning-virtual-row > button:hover,
+.app-shell[data-theme] .planning-virtual-row > button.is-active {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 42%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .map-planning-stage.is-unbounded {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Complete theme coverage for focused writing and planning workspaces. */
+.app-shell[data-theme] :where(.manuscript-shell, .manuscript-writing-panel) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.manuscript-tree-panel, .manuscript-inspector,
+  .manuscript-inspector-tabs) {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.manuscript-tree-heading, .manuscript-writing-header,
+  .manuscript-book-tree + .manuscript-book-tree,
+  .manuscript-inspector-tabs .manuscript-inspector-close) {
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(.manuscript-tree-heading strong,
+  .manuscript-tree-book-row, .manuscript-title-line > input,
+  .manuscript-empty-state h2) {
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.manuscript-tree-heading span,
+  .manuscript-tree-volume-row, .manuscript-breadcrumb,
+  .manuscript-title-line > div > span, .manuscript-empty-state) {
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] :where(.manuscript-tree-search,
+  .manuscript-quick-meta select, .manuscript-quick-meta button,
+  .manuscript-empty-pane-controls button) {
+  background: var(--theme-input);
+  border-color: var(--theme-line-strong);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.manuscript-chapter-tree > button:hover,
+  .manuscript-chapter-tree > button.is-active,
+  .manuscript-title-line button.is-active,
+  .manuscript-inspector-tabs button.is-active) {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .manuscript-chapter-tree > button:hover,
+.app-shell[data-theme] .manuscript-chapter-tree > button.is-active,
+.app-shell[data-theme] .manuscript-inspector-tabs button.is-active {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .story-mode-switch {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] .story-mode-switch button.is-active {
+  background: var(--theme-selected);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] :where(.ai-story-layout, .ai-story-main,
+  .ai-story-library, .ai-story-workarea) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.ai-story-library, .ai-story-commandbar) {
+  background: var(--theme-panel-soft);
+}
+
+.app-shell[data-theme] :where(.ai-story-library-search,
+  .ai-story-session-heading button, .ai-story-editor-actions button,
+  .ai-story-stage-buttons button) {
+  background: var(--theme-input);
+  border-color: var(--theme-line-strong);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .ai-story-library-tabs button.is-active,
+.app-shell[data-theme] .ai-story-page-header > div:last-child button.is-active,
+.app-shell[data-theme] .ai-story-stage-buttons button.is-active {
+  background: var(--theme-selected);
+  border-color: var(--theme-accent);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] :where(.ai-story-page-header, .ai-story-commandbar,
+  .ai-story-view-tabs, .ai-story-disclosure, .ai-story-memory-disclosure) {
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(.ai-story-page-header > div:first-child input,
+  .ai-story-disclosure summary, .ai-story-draft-heading strong,
+  .ai-story-panel-heading strong) {
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.ai-story-empty, .ai-story-command-message,
+  .ai-story-disclosure summary small, .ai-story-draft-heading span,
+  .ai-story-panel-heading > span) {
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] .planning-workspace.is-map-fullscreen {
+  background: var(--theme-bg);
+  border-color: var(--theme-line-strong);
+  box-shadow: var(--theme-shadow);
+}
+
+.app-shell[data-theme] :where(.planning-search, .map-catalog-filter-bar,
+  .map-saved-filter-row select, .map-filter-save-draft,
+  .map-filter-save-draft input) {
+  background: var(--theme-input);
+  border-color: var(--theme-line);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.map-catalog-filter-bar select,
+  .map-saved-filter-row select) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line-strong);
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .map-inspector-dock-tabs {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] .map-inspector-dock-tabs button {
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] :where(.map-inspector-dock-tabs button:hover,
+  .map-inspector-dock-tabs button.is-active) {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .map-inspector-dock-tabs button:hover,
+.app-shell[data-theme] .map-inspector-dock-tabs button.is-active {
+  background: var(--theme-selected);
+  border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-line));
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .map-label-placement-control {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(.map-label-placement-control button,
+  .map-label-placement-control select, .map-marker-icon-control > button,
+  .planning-file-action) {
+  background: var(--theme-panel);
+  border-color: var(--theme-line-strong);
+  color: var(--theme-muted);
+}
+
+.app-shell[data-theme] :where(.map-label-placement-control button:hover:not(:disabled),
+  .map-label-placement-control button[aria-pressed="true"],
+  .map-marker-icon-control > button:hover:not(:disabled),
+  .planning-file-action:hover) {
+  background: var(--theme-selected);
+  border-color: var(--theme-accent);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .map-minimap {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line-strong);
+}
+
+.app-shell[data-theme] .map-minimap-generated {
+  background: var(--theme-panel-soft);
+}
+
+.app-shell[data-theme] :where(.wiki-child-category-list > div,
+  .wiki-child-category-list button, .wiki-category-entries,
+  .wiki-category-entries .wiki-entry-row) {
+  border-color: var(--theme-line);
+}
+
+.app-shell[data-theme] :where(.wiki-child-category-list button,
+  .wiki-entry-copy strong) {
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] .wiki-child-category-list button,
+.app-shell[data-theme] .wiki-entry-copy strong {
+  color: var(--theme-ink);
+}
+
+.app-shell[data-theme] :where(.wiki-child-category-list button:hover,
+  .wiki-map-index > button:hover, .wiki-map-children > button:hover,
+  .wiki-quest-links > button:hover) {
+  background: var(--theme-panel-soft);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme] .wiki-child-category-list small {
+  color: var(--theme-muted);
+}
+
+.relation-list-limit {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 2px 0 0;
+  padding: 9px 10px;
 }
