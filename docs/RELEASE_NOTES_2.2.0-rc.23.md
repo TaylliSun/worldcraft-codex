@@ -22,6 +22,7 @@
 ## 验证结果
 
 - 类型检查、剧情、引用、世界生命周期、AI 操作、发布清理和前端体积检查通过。
+- 生产依赖审计为 0 个已知漏洞，第三方许可证清单无缺失。
 - Electron 桌面全流程回归通过：531 项断言，覆盖 3 次真实启动。
 - 发行物完整性验证通过 52 项断言，打包安全验证通过 27 项断言。
 - 便携版冷启动通过 12 项断言：版本 `2.2.0-rc.23`、schema 17、SQLite `quick_check=ok`。
@@ -30,8 +31,8 @@
 
 ## Windows 产物
 
-- `Worldcraft Codex-Setup-2.2.0-rc.23.exe`：129.36 MiB；SHA-256 `999500fa6162a2670b997d24554054f9fd310b69a06c96232320a8f5576ea031`
-- `Worldcraft Codex-Portable-2.2.0-rc.23.exe`：129.19 MiB；SHA-256 `9c576d0b3f191f80561fd2cb6aab02fe6934c7ff8add4de9659afff38db4b7e7`
+- `Worldcraft Codex-Setup-2.2.0-rc.23.exe`：128.80 MiB；SHA-256 `287ce8da4a61ac643f9ffd2d21e54b1e329935269b19ab85448e0043aaaac685`
+- `Worldcraft Codex-Portable-2.2.0-rc.23.exe`：128.63 MiB；SHA-256 `bc8281ee06d22c30a4f49e9823bbb909b984100ad773f568b8be8e96f091373e`
 
 Release 同时附带 `SHA256SUMS.txt`、CycloneDX SBOM、构建来源证明、产物清单和第三方依赖清单。
 
