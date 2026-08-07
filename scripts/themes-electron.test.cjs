@@ -191,6 +191,81 @@ async function main() {
       path: path.join(runRoot, "theme-night-ai.png"),
       animations: "disabled"
     });
+    await page.getByRole("button", { name: "剧情写作", exact: true }).click();
+    await page.locator(".ai-story-layout").waitFor({ state: "visible" });
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-ai-story.png"),
+      animations: "disabled"
+    });
+
+    await page.getByRole("button", { name: "剧情", exact: true }).click();
+    await page.getByRole("button", { name: "正文", exact: true }).click();
+    await page.locator(".manuscript-shell").waitFor({ state: "visible" });
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    const manuscriptTheme = await page.evaluate(() => ({
+      selectedChapter: getComputedStyle(document.querySelector(".manuscript-chapter-tree > button.is-active")).backgroundColor,
+      selectedTheme: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--theme-selected").trim()
+    }));
+    assert.notEqual(manuscriptTheme.selectedChapter, "rgb(230, 241, 236)");
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-manuscript.png"),
+      animations: "disabled"
+    });
+
+    await page.getByRole("button", { name: "任务线", exact: true }).click();
+    await page.locator(".quest-workspace").waitFor({ state: "visible" });
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-quests.png"),
+      animations: "disabled"
+    });
+    const relationOpenStartedAt = Date.now();
+    await page.getByRole("button", { name: "关系图谱", exact: true }).click();
+    await page.locator(".relation-layout").waitFor({ state: "visible" });
+    assert.ok(Date.now() - relationOpenStartedAt < 2000, "relationship atlas should open without blocking the UI");
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-relations.png"),
+      animations: "disabled"
+    });
+    await page.getByRole("button", { name: "地图", exact: true }).click();
+    await page.locator(".map-planning-viewport").waitFor({ state: "visible" });
+    assert.equal(await page.locator(".map-planning-stage").evaluate(
+      (element) => getComputedStyle(element).borderTopWidth
+    ), "0px");
+    assert.equal(await page.locator(".map-canvas-origin").count(), 1);
+    const mapSelectionTheme = await page.evaluate(() => {
+      const shell = document.querySelector(".app-shell");
+      const selected = document.querySelector(".planning-virtual-row > button.is-active, .planning-item-list > button.is-active");
+      const probe = document.createElement("span");
+      probe.style.background = "var(--theme-selected)";
+      shell?.append(probe);
+      const expected = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return {
+        expected,
+        selected: selected ? getComputedStyle(selected).backgroundColor : ""
+      };
+    });
+    assert.equal(mapSelectionTheme.selected, mapSelectionTheme.expected);
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-map-unbounded.png"),
+      animations: "disabled"
+    });
+    await page.getByRole("button", { name: "最大化地图工作区", exact: true }).click();
+    await page.locator(".planning-workspace.is-map-fullscreen").waitFor({ state: "visible" });
+    assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    assert.notEqual(
+      await page.locator(".map-label-placement-control").evaluate((element) => getComputedStyle(element).backgroundColor),
+      "rgb(245, 248, 246)"
+    );
+    await page.screenshot({
+      path: path.join(runRoot, "theme-night-map-fullscreen.png"),
+      animations: "disabled"
+    });
+    await page.getByRole("button", { name: "退出地图专注模式", exact: true }).click();
 
     await page.locator(".tabbar").getByRole("button", { name: "世界总览", exact: true }).click();
     await page.locator(".wiki-workspace").waitFor({ state: "visible" });
@@ -284,6 +359,12 @@ async function main() {
         path.join(runRoot, "theme-night-author.png"),
         path.join(runRoot, "theme-night.png"),
         path.join(runRoot, "theme-night-ai.png"),
+        path.join(runRoot, "theme-night-ai-story.png"),
+        path.join(runRoot, "theme-night-manuscript.png"),
+        path.join(runRoot, "theme-night-quests.png"),
+        path.join(runRoot, "theme-night-relations.png"),
+        path.join(runRoot, "theme-night-map-unbounded.png"),
+        path.join(runRoot, "theme-night-map-fullscreen.png"),
         path.join(runRoot, "theme-night-wiki.png"),
         path.join(runRoot, "theme-night-wiki-article.png"),
         path.join(runRoot, "theme-paper.png"),
