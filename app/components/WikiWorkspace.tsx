@@ -127,7 +127,7 @@ export type WikiRelation = {
 export type WikiAsset = {
   id: string;
   name: string;
-  kind: "image" | "map" | "audio" | "concept" | "document";
+  kind: "image" | "map" | "video" | "audio" | "concept" | "document";
   mimeType: string;
   storedName: string;
   linkedEntityIds: string[];

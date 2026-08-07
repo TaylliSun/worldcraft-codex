@@ -26,6 +26,45 @@ const testing = loadTypeScriptModule(path.join(root, "app", "story-testing.ts"),
   "./story": story
 });
 
+const defaultShot = story.createDialogueNode("镜头一");
+assert.equal(defaultShot.mediaAssetId, "");
+assert.equal(defaultShot.durationSeconds, 4);
+assert.equal(defaultShot.shotFraming, "medium");
+assert.equal(defaultShot.transition, "cut");
+
+const normalizedLegacyShot = story.normalizeDialogueNode({
+  id: "legacy-node",
+  label: "旧对白节点",
+  text: "旧工程仍能打开"
+});
+assert.equal(normalizedLegacyShot.durationSeconds, 4);
+assert.equal(normalizedLegacyShot.shotFraming, "medium");
+assert.equal(normalizedLegacyShot.transition, "cut");
+
+const normalizedStoryboardShot = story.normalizeDialogueNode({
+  id: "storyboard-node",
+  label: "城门推镜",
+  mediaAssetId: "asset-video",
+  durationSeconds: 7.5,
+  shotFraming: "wide",
+  cameraDirection: "从城门推向守卫",
+  transition: "dissolve"
+});
+assert.equal(normalizedStoryboardShot.mediaAssetId, "asset-video");
+assert.equal(normalizedStoryboardShot.durationSeconds, 7.5);
+assert.equal(normalizedStoryboardShot.shotFraming, "wide");
+assert.equal(normalizedStoryboardShot.cameraDirection, "从城门推向守卫");
+assert.equal(normalizedStoryboardShot.transition, "dissolve");
+
+const clampedStoryboardShot = story.normalizeDialogueNode({
+  durationSeconds: 0,
+  shotFraming: "invalid",
+  transition: "invalid"
+});
+assert.equal(clampedStoryboardShot.durationSeconds, 0.5);
+assert.equal(clampedStoryboardShot.shotFraming, "medium");
+assert.equal(clampedStoryboardShot.transition, "cut");
+
 const worldId = "world-test";
 const keyVariable = {
   id: "variable-key",

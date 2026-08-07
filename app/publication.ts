@@ -127,6 +127,7 @@ export function sanitizePublicationPayload<T>(
   });
   payload.entities = entities;
   const entityIds = objectIds(entities);
+  const publicationAssetIds = objectIds(asRecords(payload.assets));
 
   const quests = asRecords(payload.quests);
   quests.forEach((quest) => {
@@ -147,6 +148,9 @@ export function sanitizePublicationPayload<T>(
       ...node,
       speakerEntityId: entityIds.has(stringValue(node.speakerEntityId))
         ? stringValue(node.speakerEntityId)
+        : "",
+      mediaAssetId: publicationAssetIds.has(stringValue(node.mediaAssetId))
+        ? stringValue(node.mediaAssetId)
         : ""
     }));
   });

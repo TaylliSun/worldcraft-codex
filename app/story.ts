@@ -11,6 +11,16 @@ export type StoryConditionOperator =
   | "truthy"
   | "falsy";
 export type StoryEffectOperation = "set" | "increment" | "decrement" | "toggle";
+export type StoryShotFraming =
+  | "establishing"
+  | "wide"
+  | "full"
+  | "medium"
+  | "close"
+  | "extreme-close"
+  | "insert"
+  | "pov";
+export type StoryShotTransition = "cut" | "fade" | "dissolve" | "wipe" | "none";
 
 export type StoryVariable = {
   id: string;
@@ -51,6 +61,11 @@ export type DialogueNode = {
   speakerEntityId: string;
   text: string;
   stageDirection: string;
+  mediaAssetId: string;
+  durationSeconds: number;
+  shotFraming: StoryShotFraming;
+  cameraDirection: string;
+  transition: StoryShotTransition;
   conditions: StoryCondition[];
   effects: StoryEffect[];
   nextNodeId: string;
@@ -99,6 +114,23 @@ const effectOperations = new Set<StoryEffectOperation>([
   "increment",
   "decrement",
   "toggle"
+]);
+const shotFramings = new Set<StoryShotFraming>([
+  "establishing",
+  "wide",
+  "full",
+  "medium",
+  "close",
+  "extreme-close",
+  "insert",
+  "pov"
+]);
+const shotTransitions = new Set<StoryShotTransition>([
+  "cut",
+  "fade",
+  "dissolve",
+  "wipe",
+  "none"
 ]);
 
 export function createStoryId(prefix: string) {
@@ -204,6 +236,11 @@ export function createDialogueNode(label = "新的对白节点"): DialogueNode {
     speakerEntityId: "",
     text: "",
     stageDirection: "",
+    mediaAssetId: "",
+    durationSeconds: 4,
+    shotFraming: "medium",
+    cameraDirection: "",
+    transition: "cut",
     conditions: [],
     effects: [],
     nextNodeId: "",
@@ -279,6 +316,17 @@ export function normalizeDialogueNode(input: Partial<DialogueNode>): DialogueNod
     speakerEntityId: input.speakerEntityId || "",
     text: input.text ?? "",
     stageDirection: input.stageDirection ?? "",
+    mediaAssetId: input.mediaAssetId || "",
+    durationSeconds: Number.isFinite(Number(input.durationSeconds))
+      ? Math.min(600, Math.max(0.5, Number(input.durationSeconds)))
+      : 4,
+    shotFraming: shotFramings.has(input.shotFraming as StoryShotFraming)
+      ? (input.shotFraming as StoryShotFraming)
+      : "medium",
+    cameraDirection: input.cameraDirection ?? "",
+    transition: shotTransitions.has(input.transition as StoryShotTransition)
+      ? (input.transition as StoryShotTransition)
+      : "cut",
     conditions: Array.isArray(input.conditions)
       ? input.conditions.map((condition) => normalizeCondition(condition))
       : [],
@@ -488,6 +536,7 @@ export function getStorySceneText(scene: StoryScene) {
           node.label,
           node.text,
           node.stageDirection,
+          node.cameraDirection,
           node.choices.map((choice) => choice.text).join(" ")
         ].join(" ")
       )
@@ -501,6 +550,7 @@ export function validateStoryScene(
     variableIds: Set<string>;
     entityIds: Set<string>;
     questIds: Set<string>;
+    assetIds?: Set<string>;
   }
 ) {
   const issues: StoryValidationIssue[] = [];
@@ -536,6 +586,15 @@ export function validateStoryScene(
       });
     }
     nodeIds.add(node.id);
+    if (node.mediaAssetId && context.assetIds && !context.assetIds.has(node.mediaAssetId)) {
+      issues.push({
+        id: `missing-node-media:${scene.id}:${node.id}`,
+        severity: "warning",
+        title: `${node.label}的预演素材不存在`,
+        detail: "重新选择图片或视频，或清空这个镜头的素材。",
+        nodeId: node.id
+      });
+    }
   });
 
   if (!nodeIds.has(scene.entryNodeId)) {

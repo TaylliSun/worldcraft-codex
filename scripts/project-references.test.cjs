@@ -97,6 +97,7 @@ function workspace() {
         id: "node-a",
         label: "开场",
         speakerEntityId: "entity-hero",
+        mediaAssetId: "asset-a",
         text: "看向 [[雾鸦堡]]。",
         conditions: [{ id: "condition-a", variableId: "variable-clue" }],
         effects: [],
@@ -198,6 +199,17 @@ check(
   index.references.some((item) => item.role === "speaker" && item.anchor.path === "nodes[0].speakerEntityId"),
   true,
   "scene speaker refs are indexed precisely"
+);
+check(
+  index.references.some(
+    (item) =>
+      item.source.id === "scene-a" &&
+      item.target.kind === "asset" &&
+      item.target.id === "asset-a" &&
+      item.anchor.path === "nodes[0].mediaAssetId"
+  ),
+  true,
+  "storyboard media participates in asset back references"
 );
 check(
   index.references.some((item) => item.source.id === "quest-main" && item.anchor.path === "summary"),

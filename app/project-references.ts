@@ -124,8 +124,10 @@ type ReferenceScene = NamedObject & {
     id?: string;
     label?: string;
     speakerEntityId?: string;
+    mediaAssetId?: string;
     text?: string;
     stageDirection?: string;
+    cameraDirection?: string;
     conditions?: Array<{ id?: string; variableId?: string }>;
     effects?: Array<{ id?: string; variableId?: string }>;
     choices?: Array<{
@@ -577,6 +579,16 @@ export function buildProjectReferenceIndex(
           anchor("对白说话者", `${nodePath}.speakerEntityId`, node.label || speakerId)
         );
       }
+      const mediaAssetId = cleanId(node.mediaAssetId);
+      if (mediaAssetId) {
+        addReference(
+          scene.worldId,
+          source,
+          { kind: "asset", id: mediaAssetId },
+          "association",
+          anchor("镜头素材", `${nodePath}.mediaAssetId`, node.label || mediaAssetId)
+        );
+      }
       addWikiLinks(scene.worldId, source, "nodes.text", `${nodePath}.text`, node.text);
       addWikiLinks(
         scene.worldId,
@@ -584,6 +596,13 @@ export function buildProjectReferenceIndex(
         "nodes.stageDirection",
         `${nodePath}.stageDirection`,
         node.stageDirection
+      );
+      addWikiLinks(
+        scene.worldId,
+        source,
+        "nodes.cameraDirection",
+        `${nodePath}.cameraDirection`,
+        node.cameraDirection
       );
       addVariableRefs(scene.worldId, source, node.conditions, `${nodePath}.conditions`);
       addVariableRefs(scene.worldId, source, node.effects, `${nodePath}.effects`);

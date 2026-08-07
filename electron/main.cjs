@@ -211,7 +211,10 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8",
   ".m4a": "audio/mp4",
   ".md": "text/markdown; charset=utf-8",
+  ".mov": "video/quicktime",
   ".mp3": "audio/mpeg",
+  ".mp4": "video/mp4",
+  ".mkv": "video/x-matroska",
   ".ogg": "audio/ogg",
   ".pdf": "application/pdf",
   ".png": "image/png",
@@ -219,6 +222,7 @@ const mimeTypes = {
   ".txt": "text/plain; charset=utf-8",
   ".wav": "audio/wav",
   ".webp": "image/webp",
+  ".webm": "video/webm",
   ".woff": "font/woff",
   ".woff2": "font/woff2"
 };
@@ -1486,7 +1490,7 @@ function registerStoreIpc() {
       properties: ["openFile", "multiSelections"],
       filters: [
         {
-          name: "图片、音频与资料",
+          name: "图片、视频、音频与资料",
           extensions: [
             "png",
             "jpg",
@@ -1494,6 +1498,10 @@ function registerStoreIpc() {
             "webp",
             "gif",
             "svg",
+            "mp4",
+            "webm",
+            "mov",
+            "mkv",
             "mp3",
             "wav",
             "ogg",
@@ -1506,6 +1514,7 @@ function registerStoreIpc() {
           ]
         },
         { name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] },
+        { name: "视频", extensions: ["mp4", "webm", "mov", "mkv"] },
         { name: "音频", extensions: ["mp3", "wav", "ogg", "flac", "m4a"] },
         { name: "所有文件", extensions: ["*"] }
       ]
@@ -1516,6 +1525,7 @@ function registerStoreIpc() {
     }
 
     const audioExtensions = new Set([".mp3", ".wav", ".ogg", ".flac", ".m4a"]);
+    const videoExtensions = new Set([".mp4", ".webm", ".mov", ".mkv"]);
     const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]);
     const importedAt = getCurrentTimestamp();
     const assets = [];
@@ -1533,6 +1543,8 @@ function registerStoreIpc() {
         originalName: path.basename(sourcePath),
         kind: audioExtensions.has(extension)
           ? "audio"
+          : videoExtensions.has(extension)
+            ? "video"
           : imageExtensions.has(extension)
             ? "image"
             : "document",

@@ -65,6 +65,7 @@ import {
   Upload,
   UsersRound,
   Variable,
+  Video,
   Maximize2
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -583,7 +584,7 @@ type RelationEvidenceType =
   | "oral-tradition"
   | "creative";
 type RelationConfidence = "unspecified" | "certain" | "probable" | "disputed" | "creative";
-type AssetKind = "image" | "map" | "audio" | "concept" | "document";
+type AssetKind = "image" | "map" | "video" | "audio" | "concept" | "document";
 
 type World = {
   id: string;
@@ -1522,6 +1523,7 @@ const relationConfidenceMeta: Record<RelationConfidence, string> = {
 const assetKindMeta: Record<AssetKind, { label: string; icon: LucideIcon; helper: string }> = {
   image: { label: "图片", icon: ImageIcon, helper: "截图、照片和通用图片" },
   map: { label: "地图", icon: Map, helper: "世界地图、区域图和关卡图" },
+  video: { label: "视频", icon: Video, helper: "过场、表演参考和分镜预演素材" },
   audio: { label: "音乐", icon: Music, helper: "配乐、环境音和语音参考" },
   concept: { label: "设定图", icon: Palette, helper: "角色、场景和物品概念图" },
   document: { label: "资料", icon: FileText, helper: "PDF、文本和其他参考文件" }
@@ -2017,6 +2019,11 @@ const initialData: WorkspaceData = {
           speakerEntityId: "entity-ailin",
           text: "守备档案被人动过。我们可以申请正式许可，也可以去旧城区找一个认识档案管理员的掮客。",
           stageDirection: "艾琳把两张不同颜色的通行证放在桌上。",
+          mediaAssetId: "",
+          durationSeconds: 8,
+          shotFraming: "medium",
+          cameraDirection: "从桌上的两张通行证缓慢抬向艾琳。",
+          transition: "cut",
           conditions: [],
           effects: [],
           nextNodeId: "",
@@ -2070,6 +2077,11 @@ const initialData: WorkspaceData = {
           speakerEntityId: "entity-ailin",
           text: "好。守备长欠我一次解释，只要我们拿到盖印文书，王都也不能轻易把门关上。",
           stageDirection: "艾琳收起旧城区的灰色通行证。",
+          mediaAssetId: "",
+          durationSeconds: 6,
+          shotFraming: "close",
+          cameraDirection: "跟随艾琳收起通行证的手，再切到她的表情。",
+          transition: "cut",
           conditions: [],
           effects: [],
           nextNodeId: "",
@@ -2082,6 +2094,11 @@ const initialData: WorkspaceData = {
           speakerEntityId: "entity-ailin",
           text: "这条路更快，也更容易惊动删改档案的人。准备好被跟踪。",
           stageDirection: "远处传来乌鸦拍打窗框的声音。",
+          mediaAssetId: "",
+          durationSeconds: 6,
+          shotFraming: "wide",
+          cameraDirection: "镜头移向窗外，再回到昏暗的档案室。",
+          transition: "dissolve",
           conditions: [],
           effects: [],
           nextNodeId: "",
@@ -3447,6 +3464,7 @@ function workspaceFromMarkdownImport(content: string, fileName = "导入的世�
         storyReviewIssues?: StoryReviewIssue[];
         entityTitles?: Record<string, string>;
         questTitles?: Record<string, string>;
+        assetNames?: Record<string, string>;
       };
       storyVariables = asArray<StoryVariable>(storyData.storyVariables).map((variable) =>
         normalizeStoryVariable({ ...variable, worldId }, worldId)
@@ -3461,6 +3479,11 @@ function workspaceFromMarkdownImport(content: string, fileName = "导入的世�
         const quest = quests.find((item) => normalize(item.title) === normalize(title));
         if (quest) questIdMap.set(oldId, quest.id);
       });
+      const assetIdMap = new globalThis.Map<string, string>();
+      Object.entries(storyData.assetNames ?? {}).forEach(([oldId, name]) => {
+        const asset = assets.find((item) => normalize(item.name) === normalize(name));
+        if (asset) assetIdMap.set(oldId, asset.id);
+      });
       storyScenes = asArray<StoryScene>(storyData.storyScenes).map((scene) =>
         normalizeStoryScene(
           {
@@ -3474,7 +3497,8 @@ function workspaceFromMarkdownImport(content: string, fileName = "导入的世�
               .filter((id): id is string => Boolean(id)),
             nodes: scene.nodes.map((node) => ({
               ...node,
-              speakerEntityId: entityIdMap.get(node.speakerEntityId) ?? ""
+              speakerEntityId: entityIdMap.get(node.speakerEntityId) ?? "",
+              mediaAssetId: assetIdMap.get(node.mediaAssetId) ?? ""
             }))
           },
           worldId
@@ -4061,7 +4085,7 @@ function mergeImportedWorkspace(
     storyNodeIdMaps.set(scene.id, nodeIdMap);
     storyChoiceIdMaps.set(scene.id, choiceIdMap);
   });
-  const importedStoryScenes = importedStorySceneCandidates.map((scene) => {
+  let importedStoryScenes = importedStorySceneCandidates.map((scene) => {
       const nodeIdMap = storyNodeIdMaps.get(scene.id) as globalThis.Map<string, string>;
       const choiceIdMap = storyChoiceIdMaps.get(scene.id) as globalThis.Map<string, string>;
       const remapConditions = (conditions: StoryCondition[]) =>
@@ -4305,6 +4329,13 @@ function mergeImportedWorkspace(
         .map((id) => entityIdMap.get(id))
         .filter((id): id is string => Boolean(id))
     }));
+  importedStoryScenes = importedStoryScenes.map((scene) => ({
+    ...scene,
+    nodes: scene.nodes.map((node) => ({
+      ...node,
+      mediaAssetId: assetIdMap.get(node.mediaAssetId) ?? ""
+    }))
+  }));
   const importedNarrativeMilestones = imported.narrativeMilestones
     .filter((milestone) => worldIdMap.has(milestone.worldId))
     .map((milestone, index) => {
@@ -5324,7 +5355,8 @@ ${richTextToPlainText(milestone.manuscriptBody) || "暂无正文"}
       entityTitles: Object.fromEntries(
         payload.entities.map((entity) => [entity.id, entity.title])
       ),
-      questTitles: Object.fromEntries(payload.quests.map((quest) => [quest.id, quest.title]))
+      questTitles: Object.fromEntries(payload.quests.map((quest) => [quest.id, quest.title])),
+      assetNames: Object.fromEntries(payload.assets.map((asset) => [asset.id, asset.name]))
     },
     null,
     2
@@ -6588,7 +6620,7 @@ export default function Home() {
           counts[asset.kind] += 1;
           return counts;
         },
-        { image: 0, map: 0, audio: 0, concept: 0, document: 0 }
+        { image: 0, map: 0, video: 0, audio: 0, concept: 0, document: 0 }
       ),
     [worldAssets]
   );
@@ -8474,7 +8506,8 @@ export default function Home() {
     const storyContext = {
       variableIds: storyVariableIds,
       entityIds,
-      questIds
+      questIds,
+      assetIds: new Set(worldAssets.map((asset) => asset.id))
     };
     worldStoryScenes.forEach((scene) => {
       validateStoryScene(scene, storyContext).forEach((issue) => {
@@ -12552,7 +12585,11 @@ export default function Home() {
   }
 
   function useSelectedAssetAsMap() {
-    if (!selectedAsset || !activeMap || selectedAsset.kind === "audio" || selectedAsset.kind === "document") {
+    if (
+      !selectedAsset ||
+      !activeMap ||
+      !["image", "map", "concept"].includes(selectedAsset.kind)
+    ) {
       return;
     }
 
@@ -12642,12 +12679,22 @@ export default function Home() {
     const sharedFileCount = selectedAsset
       ? data.assets.filter((asset) => asset.storedName === selectedAsset.storedName).length
       : 0;
+    const storyboardUseCount = selectedAsset
+      ? data.storyScenes.reduce(
+          (count, scene) =>
+            count + scene.nodes.filter((node) => node.mediaAssetId === selectedAsset.id).length,
+          0
+        )
+      : 0;
     if (
       !selectedAsset ||
       !window.confirm(
-        sharedFileCount > 1
+        (sharedFileCount > 1
           ? `删除资源“${selectedAsset.name}”？本地文件仍被其他 ${sharedFileCount - 1} 个资源引用，因此会保留。`
-          : `删除资源“${selectedAsset.name}”？文件会移入 Windows 回收站，并先创建项目备份。`
+          : `删除资源“${selectedAsset.name}”？文件会移入 Windows 回收站，并先创建项目备份。`) +
+          (storyboardUseCount
+            ? `\n\n它还用于 ${storyboardUseCount} 个剧情镜头；删除后这些镜头会改为无画面。`
+            : "")
       )
     ) {
       return;
@@ -12674,6 +12721,14 @@ export default function Home() {
       return {
         ...cleaned,
         assets: cleaned.assets.filter((asset) => asset.id !== selectedAsset.id),
+        storyScenes: cleaned.storyScenes.map((scene) => ({
+          ...scene,
+          nodes: scene.nodes.map((node) =>
+            node.mediaAssetId === selectedAsset.id
+              ? { ...node, mediaAssetId: "" }
+              : node
+          )
+        })),
         maps:
           sharedFileCount > 1
             ? cleaned.maps
@@ -15124,9 +15179,11 @@ export default function Home() {
         {activeTab === "story" && (
           <StoryWorkspace
             assets={worldAssets
-              .filter((asset) => ["image", "map", "concept"].includes(asset.kind))
+              .filter((asset) => ["image", "map", "concept", "video"].includes(asset.kind))
               .map((asset) => ({
                 id: asset.id,
+                kind: asset.kind,
+                mimeType: asset.mimeType,
                 name: asset.name,
                 storedName: asset.storedName,
                 url: getAssetUrl(asset.storedName)
@@ -15158,6 +15215,7 @@ export default function Home() {
             onLoadManuscriptChapterVersions={loadManuscriptChapterVersions}
             onExportManuscriptPublication={exportManuscriptPublication}
             onManuscriptChange={updateManuscriptWorkspace}
+            onImportAssets={importAssetFiles}
             onModeChange={setStoryWorkspaceMode}
             onOpenTimeline={openTimelineEvent}
             onRestoreManuscriptChapterVersion={restoreManuscriptChapterVersion}
@@ -16127,6 +16185,8 @@ export default function Home() {
                   <div className="asset-preview">
                     {selectedAsset.mimeType.startsWith("image/") && selectedAsset.storedName ? (
                       <img alt={selectedAsset.name} src={getAssetUrl(selectedAsset.storedName)} />
+                    ) : selectedAsset.mimeType.startsWith("video/") && selectedAsset.storedName ? (
+                      <video controls preload="metadata" src={getAssetUrl(selectedAsset.storedName)} />
                     ) : selectedAsset.kind === "audio" && selectedAsset.storedName ? (
                       <div className="asset-audio-preview">
                         <Music size={34} />
@@ -16235,7 +16295,7 @@ export default function Home() {
                   </div>
 
                   <div className="asset-action-row">
-                    {!["audio", "document"].includes(selectedAsset.kind) && (
+                    {["image", "map", "concept"].includes(selectedAsset.kind) && (
                       <button type="button" onClick={useSelectedAssetAsMap}>
                         <Map size={17} />
                         <span>设为地图</span>

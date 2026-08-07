@@ -8,17 +8,23 @@ import {
   ChevronDown,
   ChevronUp,
   CircleStop,
+  Clock3,
   Copy,
   FileText,
+  Film,
   GitBranch,
+  Image as ImageIcon,
   ListTree,
   MessagesSquare,
+  Pause,
   Play,
   Plus,
   RotateCcw,
   Search,
   Settings2,
+  SkipForward,
   Trash2,
+  Upload,
   UserRound,
   Variable
 } from "lucide-react";
@@ -63,6 +69,8 @@ import type {
   StoryEffectOperation,
   StoryScene,
   StorySceneStatus,
+  StoryShotFraming,
+  StoryShotTransition,
   StoryState,
   StoryValidationIssue,
   StoryValue,
@@ -82,6 +90,15 @@ type EntityOption = {
 type QuestOption = {
   id: string;
   title: string;
+};
+
+type StoryAssetOption = {
+  id: string;
+  kind: string;
+  mimeType: string;
+  name: string;
+  storedName: string;
+  url: string;
 };
 
 const sceneStatusMeta: Record<StorySceneStatus, { label: string; helper: string }> = {
@@ -114,6 +131,25 @@ const effectOperationLabels: Record<StoryEffectOperation, string> = {
   toggle: "切换"
 };
 
+const shotFramingLabels: Record<StoryShotFraming, string> = {
+  establishing: "大远景",
+  wide: "远景",
+  full: "全景",
+  medium: "中景",
+  close: "近景",
+  "extreme-close": "特写",
+  insert: "插入镜头",
+  pov: "主观镜头"
+};
+
+const shotTransitionLabels: Record<StoryShotTransition, string> = {
+  cut: "硬切",
+  fade: "淡入淡出",
+  dissolve: "叠化",
+  wipe: "划变",
+  none: "无转场"
+};
+
 function operatorsForVariable(variable?: StoryVariable): StoryConditionOperator[] {
   return storyConditionOperatorsForType(variable?.type);
 }
@@ -140,6 +176,7 @@ export function StoryWorkspace({
   onDeleteVariable,
   onLoadManuscriptChapterVersions,
   onExportManuscriptPublication,
+  onImportAssets,
   onManuscriptChange,
   onModeChange,
   onOpenTimeline,
@@ -162,7 +199,7 @@ export function StoryWorkspace({
   worldId,
   worldName
 }: {
-  assets: Array<{ id: string; name: string; storedName: string; url: string }>;
+  assets: StoryAssetOption[];
   entities: EntityOption[];
   manuscriptData: ManuscriptWorkspaceData;
   mode: StoryWorkspaceMode;
@@ -177,6 +214,7 @@ export function StoryWorkspace({
   onExportManuscriptPublication: (
     request: ManuscriptPublicationRequest
   ) => Promise<ManuscriptPublicationExportResult>;
+  onImportAssets: () => void | Promise<void>;
   onManuscriptChange: (
     data: ManuscriptWorkspaceData,
     reason: string,
@@ -216,6 +254,7 @@ export function StoryWorkspace({
   const [previewState, setPreviewState] = useState<StoryState>({});
   const [previewHistory, setPreviewHistory] = useState<string[]>([]);
   const [previewBlocked, setPreviewBlocked] = useState("");
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
 
   const selectedScene =
     scenes.find((scene) => scene.id === selectedSceneId) ?? scenes[0] ?? null;
@@ -257,7 +296,8 @@ export function StoryWorkspace({
         ? validateStoryScene(selectedScene, {
             variableIds: new Set(variables.map((variable) => variable.id)),
             entityIds: new Set(entities.map((entity) => entity.id)),
-            questIds: new Set(quests.map((quest) => quest.id))
+            questIds: new Set(quests.map((quest) => quest.id)),
+            assetIds: new Set(assets.map((asset) => asset.id))
           })
         : [],
     [entities, quests, selectedScene, variables]
@@ -284,13 +324,52 @@ export function StoryWorkspace({
 
   const currentPreviewNode =
     selectedScene?.nodes.find((node) => node.id === previewNodeId) ?? null;
+  const currentPreviewAsset =
+    assets.find((asset) => asset.id === currentPreviewNode?.mediaAssetId) ?? null;
+  const previewDuration = selectedScene?.nodes.reduce(
+    (total, node) => total + node.durationSeconds,
+    0
+  ) ?? 0;
+  const previewElapsed = selectedScene?.nodes
+    .slice(
+      0,
+      Math.max(
+        0,
+        selectedScene.nodes.findIndex((node) => node.id === currentPreviewNode?.id)
+      )
+    )
+    .reduce((total, node) => total + node.durationSeconds, 0) ?? 0;
 
   useEffect(() => {
     setSelectedNodeId(selectedScene?.entryNodeId || selectedScene?.nodes[0]?.id || "");
     setPreviewNodeId("");
     setPreviewHistory([]);
     setPreviewBlocked("");
+    setIsPreviewPlaying(false);
   }, [selectedScene?.id]);
+
+  useEffect(() => {
+    if (!isPreviewPlaying || mode !== "preview" || !currentPreviewNode) return;
+    if (
+      currentPreviewNode.isEnding ||
+      currentPreviewNode.choices.length ||
+      !currentPreviewNode.nextNodeId
+    ) {
+      setIsPreviewPlaying(false);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => enterPreviewNode(currentPreviewNode.nextNodeId, previewState),
+      Math.max(500, currentPreviewNode.durationSeconds * 1000)
+    );
+    return () => window.clearTimeout(timer);
+  }, [
+    currentPreviewNode?.id,
+    isPreviewPlaying,
+    mode,
+    previewState,
+    selectedScene?.id
+  ]);
 
   useEffect(() => {
     if (
@@ -342,6 +421,11 @@ export function StoryWorkspace({
     clone.speakerEntityId = node.speakerEntityId;
     clone.text = node.text;
     clone.stageDirection = node.stageDirection;
+    clone.mediaAssetId = node.mediaAssetId;
+    clone.durationSeconds = node.durationSeconds;
+    clone.shotFraming = node.shotFraming;
+    clone.cameraDirection = node.cameraDirection;
+    clone.transition = node.transition;
     clone.nextNodeId = node.nextNodeId;
     clone.isEnding = node.isEnding;
     clone.conditions = node.conditions.map((condition) => ({
@@ -409,7 +493,7 @@ export function StoryWorkspace({
     });
   }
 
-  function startPreview() {
+  function startPreview(autoPlay = false) {
     if (!selectedScene) return;
     const initialState = createInitialStoryState(variables);
     const entry = selectedScene.nodes.find((node) => node.id === selectedScene.entryNodeId);
@@ -418,6 +502,7 @@ export function StoryWorkspace({
       setPreviewState(initialState);
       setPreviewHistory([]);
       setPreviewBlocked("入口节点不存在");
+      setIsPreviewPlaying(false);
       return;
     }
     if (!storyConditionsPass(entry.conditions, variables, initialState)) {
@@ -425,12 +510,14 @@ export function StoryWorkspace({
       setPreviewState(initialState);
       setPreviewHistory([]);
       setPreviewBlocked("当前默认变量无法满足入口条件");
+      setIsPreviewPlaying(false);
       return;
     }
     setPreviewNodeId(entry.id);
     setPreviewState(applyStoryEffects(entry.effects, variables, initialState));
     setPreviewHistory([entry.id]);
     setPreviewBlocked("");
+    setIsPreviewPlaying(autoPlay);
   }
 
   function enterPreviewNode(targetNodeId: string, candidateState: StoryState) {
@@ -438,10 +525,12 @@ export function StoryWorkspace({
     const target = selectedScene.nodes.find((node) => node.id === targetNodeId);
     if (!target) {
       setPreviewBlocked("目标节点不存在");
+      setIsPreviewPlaying(false);
       return;
     }
     if (!storyConditionsPass(target.conditions, variables, candidateState)) {
       setPreviewBlocked(`“${target.label}”的进入条件尚未满足`);
+      setIsPreviewPlaying(false);
       return;
     }
     setPreviewState(applyStoryEffects(target.effects, variables, candidateState));
@@ -453,6 +542,7 @@ export function StoryWorkspace({
   function choosePreviewOption(choice: DialogueChoice) {
     const afterChoice = applyStoryEffects(choice.effects, variables, previewState);
     enterPreviewNode(choice.targetNodeId, afterChoice);
+    setIsPreviewPlaying(false);
   }
 
   function resetPreview() {
@@ -460,6 +550,7 @@ export function StoryWorkspace({
     setPreviewState(createInitialStoryState(variables));
     setPreviewHistory([]);
     setPreviewBlocked("");
+    setIsPreviewPlaying(false);
   }
 
   return (
@@ -503,7 +594,7 @@ export function StoryWorkspace({
             onClick={() => onModeChange("preview")}
           >
             <Play size={16} />
-            <span>模拟</span>
+            <span>预演</span>
           </button>
         </div>
         <button
@@ -642,6 +733,7 @@ export function StoryWorkspace({
 
                 {selectedNode ? (
                   <DialogueNodeEditor
+                    assets={assets}
                     entities={entities}
                     node={selectedNode}
                     nodes={selectedScene.nodes}
@@ -661,6 +753,7 @@ export function StoryWorkspace({
                     onDelete={() => deleteNode(selectedNode)}
                     onDuplicate={() => duplicateNode(selectedNode)}
                     onMove={(offset) => moveNode(selectedNode.id, offset)}
+                    onImportAssets={onImportAssets}
                     onRemoveChoice={(choiceId) =>
                       updateNode(selectedNode.id, {
                         choices: selectedNode.choices.filter((choice) => choice.id !== choiceId)
@@ -906,15 +999,39 @@ export function StoryWorkspace({
           <div className="panel story-preview-panel">
             <div className="panel-heading">
               <div>
-                <h2>{selectedScene?.title ?? "剧情模拟"}</h2>
-                <p>{selectedScene ? sceneStatusMeta[selectedScene.status].helper : "选择一个场景"}</p>
+                <h2>{selectedScene?.title ?? "分镜预演"}</h2>
+                <p>
+                  {selectedScene
+                    ? `${selectedScene.nodes.length} 个镜头 · 约 ${previewDuration.toFixed(1)} 秒`
+                    : "选择一个场景"}
+                </p>
               </div>
               <div className="story-preview-actions">
-                <button type="button" onClick={startPreview} disabled={!selectedScene}>
+                <button type="button" onClick={() => startPreview(true)} disabled={!selectedScene}>
                   <Play size={16} />
-                  <span>从入口开始</span>
+                  <span>从头预演</span>
                 </button>
-                <button aria-label="重置模拟" type="button" onClick={resetPreview}>
+                <button
+                  aria-label={isPreviewPlaying ? "暂停预演" : "继续预演"}
+                  disabled={!currentPreviewNode}
+                  type="button"
+                  onClick={() => setIsPreviewPlaying((playing) => !playing)}
+                >
+                  {isPreviewPlaying ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+                <button
+                  aria-label="下一镜头"
+                  disabled={!currentPreviewNode?.nextNodeId || currentPreviewNode.choices.length > 0}
+                  type="button"
+                  onClick={() => {
+                    if (currentPreviewNode?.nextNodeId) {
+                      enterPreviewNode(currentPreviewNode.nextNodeId, previewState);
+                    }
+                  }}
+                >
+                  <SkipForward size={16} />
+                </button>
+                <button aria-label="重置预演" type="button" onClick={resetPreview}>
                   <RotateCcw size={16} />
                 </button>
               </div>
@@ -932,6 +1049,30 @@ export function StoryWorkspace({
 
             {currentPreviewNode ? (
               <div className="story-preview-stage">
+                <div className="story-preview-media">
+                  {currentPreviewAsset?.mimeType.startsWith("video/") ? (
+                    <video
+                      autoPlay={isPreviewPlaying}
+                      controls
+                      key={`${currentPreviewNode.id}:${currentPreviewAsset.id}`}
+                      preload="metadata"
+                      src={currentPreviewAsset.url}
+                    />
+                  ) : currentPreviewAsset?.mimeType.startsWith("image/") ? (
+                    <img alt={currentPreviewAsset.name} src={currentPreviewAsset.url} />
+                  ) : (
+                    <div className="story-preview-media-empty">
+                      <Film size={38} />
+                      <strong>这个镜头还没有画面</strong>
+                      <span>在“场景”中选择图片或视频后会显示在这里</span>
+                    </div>
+                  )}
+                  <div className="story-preview-shot-badge">
+                    <span>{shotFramingLabels[currentPreviewNode.shotFraming]}</span>
+                    <span><Clock3 size={13} />{currentPreviewNode.durationSeconds.toFixed(1)} 秒</span>
+                    <span>{shotTransitionLabels[currentPreviewNode.transition]}</span>
+                  </div>
+                </div>
                 <div className="story-preview-node-meta">
                   <span>{currentPreviewNode.label}</span>
                   {currentPreviewNode.isEnding ? (
@@ -941,6 +1082,12 @@ export function StoryWorkspace({
                     </strong>
                   ) : null}
                 </div>
+                {currentPreviewNode.cameraDirection ? (
+                  <p className="story-camera-direction">
+                    <Film size={15} />
+                    <span>{currentPreviewNode.cameraDirection}</span>
+                  </p>
+                ) : null}
                 {currentPreviewNode.stageDirection ? (
                   <p className="story-stage-direction">{currentPreviewNode.stageDirection}</p>
                 ) : null}
@@ -990,7 +1137,7 @@ export function StoryWorkspace({
                     type="button"
                     onClick={() => enterPreviewNode(currentPreviewNode.nextNodeId, previewState)}
                   >
-                    <span>继续</span>
+                    <span>下一镜头</span>
                     <ArrowRight size={16} />
                   </button>
                 ) : (
@@ -1002,16 +1149,68 @@ export function StoryWorkspace({
               </div>
             ) : (
               <StoryEmptyState
-                actionLabel="开始模拟"
+                actionLabel="开始预演"
                 icon={<Play size={32} />}
-                title={selectedScene ? "从场景入口开始模拟" : "还没有可模拟的场景"}
-                onAction={selectedScene ? startPreview : onCreateScene}
+                title={selectedScene ? "从场景入口开始预演" : "还没有可预演的场景"}
+                onAction={selectedScene ? () => startPreview(true) : onCreateScene}
               />
             )}
 
+            {selectedScene?.nodes.length ? (
+              <div className="story-shot-timeline">
+                <div className="story-shot-timeline-heading">
+                  <div>
+                    <strong>镜头条</strong>
+                    <span>点击镜头可快速定位画面</span>
+                  </div>
+                  <span>{previewElapsed.toFixed(1)} / {previewDuration.toFixed(1)} 秒</span>
+                </div>
+                <div className="story-shot-progress" aria-hidden="true">
+                  <span
+                    style={{
+                      width: `${previewDuration ? Math.min(100, (previewElapsed / previewDuration) * 100) : 0}%`
+                    }}
+                  />
+                </div>
+                <div className="story-shot-strip">
+                  {selectedScene.nodes.map((node, index) => {
+                    const asset = assets.find((item) => item.id === node.mediaAssetId);
+                    return (
+                      <button
+                        className={node.id === currentPreviewNode?.id ? "is-active" : ""}
+                        key={node.id}
+                        type="button"
+                        onClick={() => {
+                          setPreviewNodeId(node.id);
+                          setIsPreviewPlaying(false);
+                        }}
+                      >
+                        <span className="story-shot-thumb">
+                          {asset?.mimeType.startsWith("image/") ? (
+                            <img alt="" src={asset.url} />
+                          ) : asset?.mimeType.startsWith("video/") ? (
+                            <Film size={20} />
+                          ) : (
+                            <ImageIcon size={19} />
+                          )}
+                          <em>{index + 1}</em>
+                        </span>
+                        <span>
+                          <strong>{node.label}</strong>
+                          <small>
+                            {shotFramingLabels[node.shotFraming]} · {node.durationSeconds.toFixed(1)} 秒
+                          </small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             {previewHistory.length ? (
               <div className="story-preview-history">
-                <strong>经过节点</strong>
+                <strong>本次分支路径</strong>
                 <div>
                   {previewHistory.map((nodeId, index) => (
                     <span key={`${nodeId}-${index}`}>
@@ -1117,6 +1316,7 @@ function SceneBrowser({
 }
 
 function DialogueNodeEditor({
+  assets,
   entities,
   node,
   nodes,
@@ -1124,6 +1324,7 @@ function DialogueNodeEditor({
   onDelete,
   onDuplicate,
   onMove,
+  onImportAssets,
   onRemoveChoice,
   onUpdate,
   onUpdateChoice,
@@ -1131,6 +1332,7 @@ function DialogueNodeEditor({
   worldId,
   variables
 }: {
+  assets: StoryAssetOption[];
   entities: EntityOption[];
   node: DialogueNode;
   nodes: DialogueNode[];
@@ -1138,6 +1340,7 @@ function DialogueNodeEditor({
   onDelete: () => void;
   onDuplicate: () => void;
   onMove: (offset: -1 | 1) => void;
+  onImportAssets: () => void | Promise<void>;
   onRemoveChoice: (choiceId: string) => void;
   onUpdate: (patch: Partial<DialogueNode>) => void;
   onUpdateChoice: (choiceId: string, patch: Partial<DialogueChoice>) => void;
@@ -1146,6 +1349,7 @@ function DialogueNodeEditor({
   variables: StoryVariable[];
 }) {
   const nodeIndex = nodes.findIndex((item) => item.id === node.id);
+  const currentMedia = assets.find((asset) => asset.id === node.mediaAssetId) ?? null;
   const aiTarget = (fieldPath: string, fieldLabel: string): InlineAiTarget => ({
     worldId,
     kind: "scene",
@@ -1184,6 +1388,104 @@ function DialogueNodeEditor({
           <button aria-label="删除节点" className="is-danger" type="button" onClick={onDelete}>
             <Trash2 size={16} />
           </button>
+        </div>
+      </div>
+
+      <div className="story-shot-editor">
+        <div className="story-shot-media">
+          {currentMedia?.mimeType.startsWith("video/") ? (
+            <video controls preload="metadata" src={currentMedia.url} />
+          ) : currentMedia?.mimeType.startsWith("image/") ? (
+            <img alt={currentMedia.name} src={currentMedia.url} />
+          ) : (
+            <div className="story-shot-media-empty">
+              <Film size={30} />
+              <strong>为这个镜头添加画面</strong>
+              <span>可使用图片、地图、概念图或视频</span>
+            </div>
+          )}
+        </div>
+        <div className="story-shot-controls">
+          <div className="story-shot-control-heading">
+            <div>
+              <strong>镜头与媒体</strong>
+              <span>这个对白节点会作为一个镜头进入预演</span>
+            </div>
+            <button type="button" onClick={() => void onImportAssets()}>
+              <Upload size={15} />
+              <span>导入素材</span>
+            </button>
+          </div>
+          <div className="story-shot-field-grid">
+            <StoryField label="画面素材" wide>
+              <select
+                aria-label="镜头画面素材"
+                value={node.mediaAssetId}
+                onChange={(event) => onUpdate({ mediaAssetId: event.target.value })}
+              >
+                <option value="">无画面</option>
+                {assets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.mimeType.startsWith("video/") ? "视频" : "图片"} · {asset.name}
+                  </option>
+                ))}
+              </select>
+            </StoryField>
+            <StoryField label="景别">
+              <select
+                value={node.shotFraming}
+                onChange={(event) =>
+                  onUpdate({ shotFraming: event.target.value as StoryShotFraming })
+                }
+              >
+                {(Object.keys(shotFramingLabels) as StoryShotFraming[]).map((framing) => (
+                  <option key={framing} value={framing}>
+                    {shotFramingLabels[framing]}
+                  </option>
+                ))}
+              </select>
+            </StoryField>
+            <StoryField label="时长（秒）">
+              <input
+                min="0.5"
+                max="600"
+                step="0.5"
+                type="number"
+                value={node.durationSeconds}
+                onChange={(event) =>
+                  onUpdate({
+                    durationSeconds: Math.min(
+                      600,
+                      Math.max(0.5, Number(event.target.value) || 0.5)
+                    )
+                  })
+                }
+              />
+            </StoryField>
+            <StoryField label="转场">
+              <select
+                value={node.transition}
+                onChange={(event) =>
+                  onUpdate({ transition: event.target.value as StoryShotTransition })
+                }
+              >
+                {(Object.keys(shotTransitionLabels) as StoryShotTransition[]).map(
+                  (transition) => (
+                    <option key={transition} value={transition}>
+                      {shotTransitionLabels[transition]}
+                    </option>
+                  )
+                )}
+              </select>
+            </StoryField>
+            <StoryField label="镜头调度" wide>
+              <input
+                placeholder="例如：缓慢推近，角色入画后跟拍"
+                value={node.cameraDirection}
+                onChange={(event) => onUpdate({ cameraDirection: event.target.value })}
+              />
+            </StoryField>
+          </div>
         </div>
       </div>
 

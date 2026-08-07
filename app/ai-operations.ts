@@ -258,7 +258,7 @@ export type AiOperationAsset = {
   id: string;
   worldId: string;
   name: string;
-  kind: "image" | "map" | "audio" | "concept" | "document";
+  kind: "image" | "map" | "video" | "audio" | "concept" | "document";
   storedName: string;
   originalName: string;
   mimeType: string;
@@ -393,7 +393,14 @@ const worldVisibilities = new Set<AiOperationWorld["visibility"]>(["private", "s
 const categoryIcons = new Set<CodexCategoryIcon>([
   "folder", "characters", "locations", "factions", "events", "items", "notes"
 ]);
-const assetKinds = new Set<AiOperationAsset["kind"]>(["image", "map", "audio", "concept", "document"]);
+const assetKinds = new Set<AiOperationAsset["kind"]>([
+  "image",
+  "map",
+  "video",
+  "audio",
+  "concept",
+  "document"
+]);
 const memberRoles = new Set<AiOperationMember["role"]>(["owner", "editor", "viewer", "player"]);
 const unsafeKeys = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -1139,7 +1146,12 @@ function validateWorkspace(
   const variableKeys = variables.map((item) => item.key);
   if (new Set(variableKeys).size !== variableKeys.length) errors.push("剧情变量键重复");
   for (const scene of scenes) {
-    const issues = validateStoryScene(scene, { variableIds, entityIds, questIds });
+    const issues = validateStoryScene(scene, {
+      variableIds,
+      entityIds,
+      questIds,
+      assetIds: referenceIds.asset
+    });
     errors.push(...issues.filter((issue) => issue.severity === "error").map((issue) => issue.title));
   }
 
@@ -1838,7 +1850,10 @@ function compactSections(workspace: AiOperationWorkspace, worldId: string) {
       entryNodeId: item.entryNodeId, relatedEntityIds: item.relatedEntityIds, relatedQuestIds: item.relatedQuestIds,
       nodes: item.nodes.slice(0, 30).map((node) => ({
         id: node.id, label: node.label, speakerEntityId: node.speakerEntityId,
-        text: node.text.slice(0, 500), nextNodeId: node.nextNodeId, isEnding: node.isEnding,
+        text: node.text.slice(0, 500), stageDirection: node.stageDirection.slice(0, 500),
+        mediaAssetId: node.mediaAssetId, durationSeconds: node.durationSeconds,
+        shotFraming: node.shotFraming, cameraDirection: node.cameraDirection.slice(0, 500),
+        transition: node.transition, nextNodeId: node.nextNodeId, isEnding: node.isEnding,
         choices: node.choices.slice(0, 12).map((choice) => ({ id: choice.id, text: choice.text.slice(0, 300), targetNodeId: choice.targetNodeId }))
       }))
     })),
