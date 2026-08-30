@@ -51,7 +51,9 @@ if (!quick) {
     "test:resilience",
     "build:web",
     "test:bundle",
-    "test:e2e"
+    "test:e2e",
+    "test:themes",
+    "test:relation-scale"
   );
 }
 

@@ -9,6 +9,7 @@ import {
   ChevronsUp,
   FileText,
   Flag,
+  Gauge,
   Layers3,
   ListTree,
   LocateFixed,
@@ -187,6 +188,11 @@ const MIN_ZOOM = 0.5;
 const NETWORK_MIN_ZOOM = 0.2;
 const MAX_ZOOM = 1.6;
 const DEFAULT_ATLAS_RELATION_LIMIT = 8;
+const DEFAULT_NETWORK_ENTITY_LIMIT = 320;
+const NETWORK_FORCE_LAYOUT_LIMIT = 260;
+const NETWORK_ENTITY_LIMIT_OPTIONS = [320, 640, 1200] as const;
+
+type NetworkEntityLimit = (typeof NETWORK_ENTITY_LIMIT_OPTIONS)[number];
 
 function clampZoom(value: number, minimum = MIN_ZOOM) {
   return Math.min(MAX_ZOOM, Math.max(minimum, Number(value.toFixed(2))));
@@ -427,6 +433,9 @@ export function RelationGraph({
     DEFAULT_ATLAS_RELATION_LIMIT
   );
   const [laneScope, setLaneScope] = useState<RelationLaneScope>("direct");
+  const [networkEntityLimit, setNetworkEntityLimit] = useState<NetworkEntityLimit>(
+    DEFAULT_NETWORK_ENTITY_LIMIT
+  );
   const [networkMinStrength, setNetworkMinStrength] = useState<1 | 2 | 3 | 4>(1);
   const [orbitDepth, setOrbitDepth] = useState<1 | 2 | 3>(1);
   const [query, setQuery] = useState("");
@@ -445,6 +454,8 @@ export function RelationGraph({
     scrollTop: number;
   } | null>(null);
   const initialFitRef = useRef(false);
+  const previousNetworkEntityLimitRef = useRef<NetworkEntityLimit>(networkEntityLimit);
+  const previousNetworkMinStrengthRef = useRef<1 | 2 | 3 | 4>(networkMinStrength);
   const previousOrbitDepthRef = useRef<1 | 2 | 3>(orbitDepth);
   const previousViewModeRef = useRef<RelationGraphViewMode>(viewMode);
   const markerPrefix = `relation-${useId().replaceAll(":", "")}`;
@@ -505,6 +516,7 @@ export function RelationGraph({
 
   const directStrengthByEntity = useMemo(() => {
     const strengths = new Map<string, number>();
+    if (viewMode !== "focus") return strengths;
     activeRelations.forEach((relation) => {
       const otherEntityId =
         relation.sourceEntityId === focusedEntityId
@@ -517,16 +529,75 @@ export function RelationGraph({
       strengths.set(otherEntityId, Math.max(strengths.get(otherEntityId) ?? 0, strength));
     });
     return strengths;
-  }, [activeRelations, focusedEntityId]);
+  }, [activeRelations, focusedEntityId, viewMode]);
+
+  const networkRelations = useMemo(
+    () => activeRelations.filter((relation) => relation.strength >= networkMinStrength),
+    [activeRelations, networkMinStrength]
+  );
+
+  const networkRelationCountByEntity = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (viewMode !== "network") return counts;
+    networkRelations.forEach((relation) => {
+      counts.set(relation.sourceEntityId, (counts.get(relation.sourceEntityId) ?? 0) + 1);
+      counts.set(relation.targetEntityId, (counts.get(relation.targetEntityId) ?? 0) + 1);
+    });
+    return counts;
+  }, [networkRelations, viewMode]);
+
+  const networkRankedEntities = useMemo(() => {
+    if (viewMode !== "network") return [];
+    return [...entities].sort(
+      (left, right) =>
+        Number(right.id === focusedEntityId) - Number(left.id === focusedEntityId) ||
+        Number((networkRelationCountByEntity.get(right.id) ?? 0) > 0) -
+          Number((networkRelationCountByEntity.get(left.id) ?? 0) > 0) ||
+        (networkRelationCountByEntity.get(right.id) ?? 0) -
+          (networkRelationCountByEntity.get(left.id) ?? 0) ||
+        typeOrder.indexOf(left.type) - typeOrder.indexOf(right.type) ||
+        left.title.localeCompare(right.title, "zh-CN")
+    );
+  }, [entities, focusedEntityId, networkRelationCountByEntity, viewMode]);
+
+  const availableNetworkEntityLimits = useMemo(() => {
+    const cappedEntityCount = Math.min(
+      entities.length,
+      NETWORK_ENTITY_LIMIT_OPTIONS[NETWORK_ENTITY_LIMIT_OPTIONS.length - 1]
+    );
+    const terminalLimit =
+      NETWORK_ENTITY_LIMIT_OPTIONS.find((limit) => limit >= cappedEntityCount) ??
+      NETWORK_ENTITY_LIMIT_OPTIONS[NETWORK_ENTITY_LIMIT_OPTIONS.length - 1];
+    return NETWORK_ENTITY_LIMIT_OPTIONS.filter((limit) => limit <= terminalLimit);
+  }, [entities.length]);
+
+  useEffect(() => {
+    if (availableNetworkEntityLimits.includes(networkEntityLimit)) return;
+    setNetworkEntityLimit(
+      availableNetworkEntityLimits[availableNetworkEntityLimits.length - 1] ??
+        DEFAULT_NETWORK_ENTITY_LIMIT
+    );
+  }, [availableNetworkEntityLimits, networkEntityLimit]);
 
   const displayedEntities = useMemo(() => {
     if (viewMode === "all") return [];
+    if (viewMode === "network") {
+      return networkRankedEntities.slice(0, networkEntityLimit);
+    }
     if (viewMode !== "focus" || !focusedEntityId) return entities;
     return entities.filter(
       (entity) =>
         (relationDegreeByEntity.get(entity.id) ?? Number.POSITIVE_INFINITY) <= orbitDepth
     );
-  }, [entities, focusedEntityId, orbitDepth, relationDegreeByEntity, viewMode]);
+  }, [
+    entities,
+    focusedEntityId,
+    networkEntityLimit,
+    networkRankedEntities,
+    orbitDepth,
+    relationDegreeByEntity,
+    viewMode
+  ]);
 
   const atlasScopedRelations = useMemo(() => {
     if (!focusedEntityId || laneScope === "all") return activeRelations;
@@ -598,14 +669,20 @@ export function RelationGraph({
 
   const displayedRelations = useMemo(
     () =>
-      activeRelations.filter(
+      (viewMode === "network" ? networkRelations : activeRelations).filter(
         (relation) =>
           displayedEntityIds.has(relation.sourceEntityId) &&
-          displayedEntityIds.has(relation.targetEntityId) &&
-          (viewMode !== "network" || relation.strength >= networkMinStrength)
+          displayedEntityIds.has(relation.targetEntityId)
       ),
-    [activeRelations, displayedEntityIds, networkMinStrength, viewMode]
+    [activeRelations, displayedEntityIds, networkRelations, viewMode]
   );
+
+  const hiddenNetworkEntityCount = viewMode === "network"
+    ? Math.max(0, entities.length - displayedEntities.length)
+    : 0;
+  const nextNetworkEntityLimit = viewMode === "network"
+    ? availableNetworkEntityLimits.find((limit) => limit > displayedEntities.length) ?? null
+    : null;
 
   const displayedNeighborIds = useMemo(() => {
     const neighbors = new Set<string>();
@@ -783,6 +860,98 @@ export function RelationGraph({
         orbitRings,
         positions,
         width
+      };
+    }
+
+    if (displayedEntities.length > NETWORK_FORCE_LAYOUT_LIMIT) {
+      const clusterGap = 72;
+      const clusterPaddingX = 46;
+      const clusterPaddingTop = 68;
+      const clusterPaddingBottom = 34;
+      const nodeGapX = 26;
+      const nodeGapY = 24;
+      const clusterSpecs = grouped.map((group) => {
+        const columns = Math.max(
+          1,
+          Math.min(28, Math.ceil(Math.sqrt(group.entities.length * 1.7)))
+        );
+        const rows = Math.max(1, Math.ceil(group.entities.length / columns));
+        return {
+          columns,
+          group,
+          height:
+            clusterPaddingTop +
+            rows * nodeHeight +
+            Math.max(0, rows - 1) * nodeGapY +
+            clusterPaddingBottom,
+          rows,
+          width:
+            clusterPaddingX * 2 +
+            columns * nodeWidth +
+            Math.max(0, columns - 1) * nodeGapX
+        };
+      });
+      const totalClusterArea = clusterSpecs.reduce(
+        (total, spec) => total + spec.width * spec.height,
+        0
+      );
+      const targetWidth = Math.max(
+        1600,
+        Math.min(12000, Math.ceil(Math.sqrt(totalClusterArea * 1.55)))
+      );
+      const networkClusters: Array<{
+        count: number;
+        height: number;
+        type: RelationGraphEntityType;
+        width: number;
+        x: number;
+        y: number;
+      }> = [];
+      let cursorX = 54;
+      let cursorY = 54;
+      let maximumRight = 0;
+      let rowHeight = 0;
+
+      clusterSpecs.forEach((spec) => {
+        if (cursorX > 54 && cursorX + spec.width > targetWidth) {
+          cursorX = 54;
+          cursorY += rowHeight + clusterGap;
+          rowHeight = 0;
+        }
+        spec.group.entities.forEach((entity, index) => {
+          const column = index % spec.columns;
+          const row = Math.floor(index / spec.columns);
+          positions.set(entity.id, {
+            x: cursorX + clusterPaddingX + column * (nodeWidth + nodeGapX),
+            y: cursorY + clusterPaddingTop + row * (nodeHeight + nodeGapY),
+            type: entity.type
+          });
+        });
+        networkClusters.push({
+          count: spec.group.entities.length,
+          height: spec.height,
+          type: spec.group.type,
+          width: spec.width,
+          x: cursorX,
+          y: cursorY
+        });
+        maximumRight = Math.max(maximumRight, cursorX + spec.width);
+        rowHeight = Math.max(rowHeight, spec.height);
+        cursorX += spec.width + clusterGap;
+      });
+
+      return {
+        gapX,
+        grouped,
+        height: Math.max(720, cursorY + rowHeight + 54),
+        layout: "network" as const,
+        networkClusters,
+        nodeHeight,
+        nodeWidth,
+        orbitCenter: null,
+        orbitRings: [],
+        positions,
+        width: Math.max(1080, maximumRight + 54)
       };
     }
 
@@ -1005,15 +1174,23 @@ export function RelationGraph({
     const viewModeChanged = previousViewModeRef.current !== viewMode;
     const orbitDepthChanged =
       viewMode === "focus" && previousOrbitDepthRef.current !== orbitDepth;
+    const networkScopeChanged =
+      viewMode === "network" &&
+      (previousNetworkEntityLimitRef.current !== networkEntityLimit ||
+        previousNetworkMinStrengthRef.current !== networkMinStrength);
     initialFitRef.current = true;
+    previousNetworkEntityLimitRef.current = networkEntityLimit;
+    previousNetworkMinStrengthRef.current = networkMinStrength;
     previousOrbitDepthRef.current = orbitDepth;
     previousViewModeRef.current = viewMode;
-    if (!shouldFitInitially && !viewModeChanged && !orbitDepthChanged) return;
+    if (!shouldFitInitially && !viewModeChanged && !orbitDepthChanged && !networkScopeChanged) {
+      return;
+    }
     const frame = requestAnimationFrame(() =>
       fitToView(shouldFitInitially ? "auto" : "smooth")
     );
     return () => cancelAnimationFrame(frame);
-  }, [fitToView, orbitDepth, viewMode]);
+  }, [fitToView, networkEntityLimit, networkMinStrength, orbitDepth, viewMode]);
 
   useEffect(() => {
     const entityId = pendingCenterEntityIdRef.current;
@@ -1039,6 +1216,10 @@ export function RelationGraph({
     setQuery("");
     setSearchOpen(false);
     chooseEntity(entityId);
+  }
+
+  function showMoreNetworkEntities() {
+    if (nextNetworkEntityLimit) setNetworkEntityLimit(nextNetworkEntityLimit);
   }
 
   function toggleRelationKind(kind: string) {
@@ -1274,21 +1455,45 @@ export function RelationGraph({
             </select>
           </label>
         ) : (
-          <label className="relation-graph-scope" title="控制全关系图谱的关系密度">
-            <Layers3 size={14} />
-            <select
-              aria-label="全关系图谱强度"
-              value={networkMinStrength}
-              onChange={(event) =>
-                setNetworkMinStrength(Number(event.target.value) as 1 | 2 | 3 | 4)
-              }
-            >
-              <option value="1">全部强度</option>
-              <option value="2">强度 2 以上</option>
-              <option value="3">强度 3 以上</option>
-              <option value="4">仅强关系</option>
-            </select>
-          </label>
+          <div className="relation-network-scope-controls">
+            <label className="relation-graph-scope" title="控制全关系图谱的关系密度">
+              <Layers3 size={14} />
+              <select
+                aria-label="全关系图谱强度"
+                value={networkMinStrength}
+                onChange={(event) =>
+                  setNetworkMinStrength(Number(event.target.value) as 1 | 2 | 3 | 4)
+                }
+              >
+                <option value="1">全部强度</option>
+                <option value="2">强度 2 以上</option>
+                <option value="3">强度 3 以上</option>
+                <option value="4">仅强关系</option>
+              </select>
+            </label>
+            {entities.length > DEFAULT_NETWORK_ENTITY_LIMIT ? (
+              <label className="relation-graph-scope" title="控制全关系图谱一次显示的条目数量">
+                <Gauge size={14} />
+                <select
+                  aria-label="全关系图谱规模"
+                  value={networkEntityLimit}
+                  onChange={(event) =>
+                    setNetworkEntityLimit(Number(event.target.value) as NetworkEntityLimit)
+                  }
+                >
+                  {availableNetworkEntityLimits.map((limit) => (
+                    <option key={limit} value={limit}>
+                      {limit >= entities.length
+                        ? `全部 ${entities.length} 个条目`
+                        : limit === NETWORK_ENTITY_LIMIT_OPTIONS[NETWORK_ENTITY_LIMIT_OPTIONS.length - 1]
+                          ? `${limit} 个核心条目`
+                          : `${limit} 个条目`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
         )}
 
         {viewMode !== "all" ? (
@@ -1390,6 +1595,15 @@ export function RelationGraph({
           onPointerUp={stopPanning}
           onWheel={handleWheel}
         >
+        {viewMode === "network" && displayedEntities.length > NETWORK_FORCE_LAYOUT_LIMIT ? (
+          <div className="relation-network-layout-status" role="status">
+            <Gauge size={13} />
+            <span>
+              快速布局 · {displayedEntities.length}
+              {hiddenNetworkEntityCount ? `/${entities.length}` : ""} 个条目
+            </span>
+          </div>
+        ) : null}
         <div
           className="relation-graph-stage"
           style={{ minHeight: Math.max(340, scaledHeight), minWidth: scaledWidth }}
@@ -1756,6 +1970,23 @@ export function RelationGraph({
               更多 {hiddenAtlasRelationCount}
             </button>
           ) : null}
+          {viewMode === "network" && nextNetworkEntityLimit ? (
+            <button
+              aria-label="显示更多全关系图谱条目"
+              data-relation-interactive="true"
+              title={`继续展开剩余 ${hiddenNetworkEntityCount} 个条目`}
+              type="button"
+              onClick={showMoreNetworkEntities}
+            >
+              <ChevronsDown size={13} />
+              更多 {hiddenNetworkEntityCount}
+            </button>
+          ) : null}
+          {viewMode === "network" && hiddenNetworkEntityCount > 0 && !nextNetworkEntityLimit ? (
+            <span className="relation-graph-limit-note">
+              已显示核心条目，搜索可定位全部 {entities.length} 个条目
+            </span>
+          ) : null}
           <span className="relation-graph-count">
             {viewMode === "focus" && focusedEntity
               ? `核心：${focusedEntity.title} · ${orbitDepth === 1 ? "直接关系" : `展开 ${orbitDepth} 度`} · `
@@ -1771,7 +2002,10 @@ export function RelationGraph({
               </>
             ) : (
               <>
-                {displayedEntities.length} 个条目 · {displayedRelations.length} 条关系
+                {displayedEntities.length}
+                {viewMode === "network" && hiddenNetworkEntityCount > 0
+                  ? `/${entities.length}`
+                  : ""} 个条目 · {displayedRelations.length} 条关系
               </>
             )}
           </span>

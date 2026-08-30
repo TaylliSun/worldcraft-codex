@@ -6171,6 +6171,9 @@ body.quest-visual-fullscreen-open {
 .template-ledger-row .is-incomplete strong { color: var(--coral); }
 .template-ledger-row .is-complete strong { color: var(--accent-dark); }
 .template-ledger-row div small { color: var(--muted); display: block; font-size: 10px; }
+.template-ledger-more { align-items: center; background: var(--panel-soft); border-bottom: 1px solid var(--line); color: var(--muted); display: flex; font-size: 11px; justify-content: center; min-height: 52px; padding: 8px 12px; position: relative; }
+.template-ledger-more button { align-items: center; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--accent-dark); display: inline-flex; font-weight: 750; gap: 6px; min-height: 34px; padding: 0 11px; }
+.template-ledger-more span { left: 12px; position: absolute; }
 .template-empty { color: var(--muted); display: grid; gap: 6px; justify-items: center; padding: 70px 20px; text-align: center; }
 .template-boolean-control { align-items: center; background: #f4f7f5; border: 1px solid var(--line); display: flex; gap: 7px; min-height: 36px; padding: 0 9px; }
 
@@ -8378,6 +8381,13 @@ button {
   opacity: 0.42;
 }
 
+.relation-network-scope-controls {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
 .relation-graph-controls {
   align-items: center;
   background: #f8faf9;
@@ -8445,6 +8455,27 @@ button {
   overflow: auto;
   outline: 0;
   touch-action: none;
+}
+
+.relation-network-layout-status {
+  align-items: center;
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  display: flex;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 5px;
+  height: 26px;
+  margin: 8px 0 -34px 8px;
+  padding: 0 8px;
+  pointer-events: none;
+  position: sticky;
+  top: 8px;
+  width: max-content;
+  z-index: 5;
 }
 
 .relation-graph-scroll:focus-visible {
@@ -9692,6 +9723,12 @@ button {
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: 750;
+}
+
+.relation-graph-limit-note {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: auto;
 }
 
 .relation-graph-summary {
@@ -18373,12 +18410,17 @@ button {
   width: 100%;
 }
 
+.map-minimap-map-bounds {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(20, 51, 39, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+  position: absolute;
+}
+
 .map-minimap-generated {
-  height: 100%;
-  inset: 0;
   object-fit: cover;
   position: absolute;
-  width: 100%;
 }
 
 .map-minimap-generated {
@@ -20834,6 +20876,12 @@ body.map-focus-open {
   .relation-graph-scope select {
     min-width: 0;
     width: 100%;
+  }
+
+  .relation-network-scope-controls {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .relation-graph-footer {
@@ -23754,8 +23802,25 @@ body.map-focus-open {
   .ai-story-brief-grid label > span, .ai-memory-field > span,
   .ai-memory-fact-grid label > span, .ai-story-page-header > div:first-child span,
   .ai-story-view-tabs button, .ai-operator-context-note,
-  .ai-operator-run-list article > p) {
+  .ai-operator-run-list article > p, .ai-operator-input > span,
+  .ai-operator-context-counts span, .ai-operator-empty) {
   color: var(--theme-muted);
+}
+
+.app-shell[data-theme="night"] .ai-operator-status span {
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme="night"] .ai-operator-history > header > span {
+  background: var(--theme-selected);
+  color: var(--theme-accent-strong);
+}
+
+.app-shell[data-theme="night"] .ai-operator-run:disabled {
+  background: var(--theme-panel-soft);
+  border-color: var(--theme-line-strong);
+  color: var(--theme-muted);
+  opacity: 1;
 }
 
 .app-shell[data-theme="night"] :where(.wiki-home-section, .wiki-reading-page,

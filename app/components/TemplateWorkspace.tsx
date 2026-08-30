@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  ChevronsDown,
   ClipboardList,
   Copy,
   EyeOff,
@@ -15,7 +16,7 @@ import {
   Tags,
   Trash2
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   entityTemplateFieldTypeLabels,
   getTemplateCompletion,
@@ -43,6 +44,7 @@ type LedgerEntity = {
 };
 
 type WorkspaceMode = "studio" | "ledger";
+const TEMPLATE_LEDGER_PAGE_SIZE = 120;
 
 export function TemplateWorkspace({
   templates,
@@ -86,6 +88,7 @@ export function TemplateWorkspace({
   const [batchTemplateId, setBatchTemplateId] = useState("");
   const [batchVisibility, setBatchVisibility] = useState<LedgerEntity["visibility"] | "">("");
   const [batchTags, setBatchTags] = useState("");
+  const [ledgerVisibleLimit, setLedgerVisibleLimit] = useState(TEMPLATE_LEDGER_PAGE_SIZE);
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? templates[0] ?? null;
   const usageCounts = useMemo(() => entities.reduce<Record<string, number>>((counts, entity) => {
     const template = resolveEntityTemplate(templates, entity);
@@ -107,10 +110,31 @@ export function TemplateWorkspace({
       )
       .sort((left, right) => left.completion.percent - right.completion.percent || left.entity.title.localeCompare(right.entity.title, "zh-CN"));
   }, [completionFilter, entities, query, templateFilter, templates, typeFilter]);
+  const visibleLedgerRows = ledgerRows.slice(0, ledgerVisibleLimit);
+  const hiddenLedgerRowCount = Math.max(0, ledgerRows.length - visibleLedgerRows.length);
+  const checkedIdSet = useMemo(() => new Set(checkedIds), [checkedIds]);
+  const filteredEntityIds = useMemo(
+    () => ledgerRows.map(({ entity }) => entity.id),
+    [ledgerRows]
+  );
+  const allFilteredEntitiesChecked = filteredEntityIds.length > 0
+    && filteredEntityIds.every((id) => checkedIdSet.has(id));
   const incompleteCount = entities.filter((entity) => getTemplateCompletion(resolveEntityTemplate(templates, entity), entity.templateData).percent < 100).length;
+
+  useEffect(() => {
+    setLedgerVisibleLimit(TEMPLATE_LEDGER_PAGE_SIZE);
+  }, [completionFilter, query, templateFilter, typeFilter]);
 
   function toggleEntity(id: string) {
     setCheckedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  function toggleFilteredEntities() {
+    const filteredSet = new Set(filteredEntityIds);
+    setCheckedIds((current) => allFilteredEntitiesChecked
+      ? current.filter((id) => !filteredSet.has(id))
+      : [...new Set([...current, ...filteredEntityIds])]
+    );
   }
 
   return (
@@ -178,8 +202,9 @@ export function TemplateWorkspace({
           </div>
           {checkedIds.length ? <div className="template-batchbar"><strong>{checkedIds.length} 个条目</strong><select aria-label="批量应用模板" value={batchTemplateId} onChange={(event) => setBatchTemplateId(event.target.value)}><option value="">选择模板</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select><button disabled={!batchTemplateId} type="button" onClick={() => { onApplyTemplate(checkedIds, batchTemplateId); setCheckedIds([]); }}>应用模板</button><select aria-label="批量可见性" value={batchVisibility} onChange={(event) => setBatchVisibility(event.target.value as typeof batchVisibility)}><option value="">选择可见性</option><option value="private">私密</option><option value="shared">成员可见</option><option value="public">公开</option><option value="secret">秘密</option></select><input value={batchTags} onChange={(event) => setBatchTags(event.target.value)} placeholder="追加标签，用逗号分隔" /><button disabled={!batchVisibility && !batchTags.trim()} type="button" onClick={() => { onBatchUpdate(checkedIds, { visibility: batchVisibility || undefined, tags: batchTags.trim() ? batchTags.split(/[,，]/).map((item) => item.trim()).filter(Boolean) : undefined }); setCheckedIds([]); setBatchTags(""); }}>批量更新</button></div> : null}
           <div className="template-ledger-table" role="table" aria-label="设定资料台账">
-            <div className="template-ledger-header" role="row"><span /><span>条目</span><span>类型</span><span>模板</span><span>必填完成度</span><span>可见性</span><span>更新</span></div>
-            {ledgerRows.map(({ entity, template, completion }) => <div className="template-ledger-row" role="row" key={entity.id}><input aria-label={`选择 ${entity.title}`} checked={checkedIds.includes(entity.id)} type="checkbox" onChange={() => toggleEntity(entity.id)} /><button type="button" onClick={() => onOpenEntity(entity.id)}><strong>{entity.title}</strong><small>{entity.tags.slice(0, 3).join("、") || entity.summary || "暂无摘要"}</small></button><span>{templateEntityTypeLabels[entity.type]}</span><span>{template?.name ?? "失效模板"}</span><div className={completion.percent < 100 ? "is-incomplete" : "is-complete"}><strong>{completion.percent}%</strong><progress max={100} value={completion.percent} /><small>{completion.missingKeys.length ? `缺 ${completion.missingKeys.length} 项` : "已完成"}</small></div><span>{entity.visibility === "public" ? "公开" : entity.visibility === "shared" ? "成员可见" : entity.visibility === "secret" ? "秘密" : "私密"}</span><span>{new Date(entity.updatedAt).toLocaleDateString("zh-CN")}</span></div>)}
+            <div className="template-ledger-header" role="row"><input aria-label="选择当前筛选的全部条目" checked={allFilteredEntitiesChecked} disabled={!filteredEntityIds.length} title="选择当前筛选的全部条目" type="checkbox" onChange={toggleFilteredEntities} /><span>条目</span><span>类型</span><span>模板</span><span>必填完成度</span><span>可见性</span><span>更新</span></div>
+            {visibleLedgerRows.map(({ entity, template, completion }) => <div className="template-ledger-row" role="row" key={entity.id}><input aria-label={`选择 ${entity.title}`} checked={checkedIdSet.has(entity.id)} type="checkbox" onChange={() => toggleEntity(entity.id)} /><button type="button" onClick={() => onOpenEntity(entity.id)}><strong>{entity.title}</strong><small>{entity.tags.slice(0, 3).join("、") || entity.summary || "暂无摘要"}</small></button><span>{templateEntityTypeLabels[entity.type]}</span><span>{template?.name ?? "失效模板"}</span><div className={completion.percent < 100 ? "is-incomplete" : "is-complete"}><strong>{completion.percent}%</strong><progress max={100} value={completion.percent} /><small>{completion.missingKeys.length ? `缺 ${completion.missingKeys.length} 项` : "已完成"}</small></div><span>{entity.visibility === "public" ? "公开" : entity.visibility === "shared" ? "成员可见" : entity.visibility === "secret" ? "秘密" : "私密"}</span><span>{new Date(entity.updatedAt).toLocaleDateString("zh-CN")}</span></div>)}
+            {hiddenLedgerRowCount ? <div className="template-ledger-more"><span>已显示 {visibleLedgerRows.length}/{ledgerRows.length} 个条目</span><button aria-label="显示更多设定资料条目" type="button" onClick={() => setLedgerVisibleLimit((current) => current + TEMPLATE_LEDGER_PAGE_SIZE)}><ChevronsDown size={15} />再显示 {Math.min(TEMPLATE_LEDGER_PAGE_SIZE, hiddenLedgerRowCount)} 个</button></div> : null}
             {!ledgerRows.length ? <div className="template-empty"><CheckCircle2 size={28} /><strong>当前筛选下没有条目</strong></div> : null}
           </div>
         </div>

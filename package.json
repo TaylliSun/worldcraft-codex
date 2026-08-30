@@ -1,12 +1,16 @@
 {
   "name": "worldcraft-codex",
-  "version": "2.2.0-rc.23",
+  "version": "2.2.0-rc.24",
   "description": "A local desktop worldbuilding codex for fiction, RPG campaigns, and game lore.",
   "author": {
     "name": "Worldcraft Codex Project"
   },
   "license": "UNLICENSED",
   "private": true,
+  "homepage": "https://tayllisun.github.io/worldcraft-codex-releases/",
+  "bugs": {
+    "url": "https://github.com/TaylliSun/worldcraft-codex-releases/issues"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "native:rebuild": "electron-builder install-app-deps",
@@ -188,6 +192,7 @@
     "test:wiki-publication": "node scripts/wiki-publication.test.cjs",
     "test:wiki-electron": "node scripts/wiki-electron.test.cjs",
     "test:themes": "node scripts/themes-electron.test.cjs",
+    "test:relation-scale": "set ELECTRON_RUN_AS_NODE=1&& electron scripts/relation-scale-electron.test.cjs",
     "test:release": "node scripts/release-diagnostics.test.cjs",
     "test:resilience": "set ELECTRON_RUN_AS_NODE=1&& electron scripts/release-resilience.test.cjs",
     "test:migrations": "set ELECTRON_RUN_AS_NODE=1&& electron scripts/migration-matrix.test.cjs",
@@ -236,6 +241,7 @@
   },
   "overrides": {
     "js-yaml": "4.3.1",
+    "nanoid": "3.3.17",
     "postcss": "8.5.25",
     "sharp": "0.35.3"
   }

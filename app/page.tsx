@@ -14419,7 +14419,7 @@ export default function Home() {
         <button
           aria-label="全局搜索"
           className="rail-search"
-          title="全局搜索"
+          title="全局搜索（Ctrl+K）"
           type="button"
           onClick={() => setGlobalSearchOpen(true)}
         >
@@ -14587,7 +14587,7 @@ export default function Home() {
             <button
               aria-label="全局搜索"
               className="topbar-command"
-              title="全局搜索"
+              title="全局搜索（Ctrl+K）"
               type="button"
               onClick={() => setGlobalSearchOpen(true)}
             >

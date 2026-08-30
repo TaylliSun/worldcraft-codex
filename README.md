@@ -60,6 +60,8 @@ npm run test:portable-package
 
 `npm run dist` 会在 `release/` 生成 Windows x64 便携版和 NSIS 安装版。发布门禁覆盖 SQLite、迁移、异常重启、项目包、性能、Wiki、地图、文稿、AI、安全配置、生产构建和桌面端到端流程。
 
+公开安装包、便携版、校验文件和隐私说明位于 [Worldcraft Codex 公开发行站](https://tayllisun.github.io/worldcraft-codex-releases/)。开发仓库保持私有，公开发行站不包含用户项目数据或案例工程。
+
 ## 数据边界
 
 - 项目正文、资源、备份和 AI 凭据默认留在本机。

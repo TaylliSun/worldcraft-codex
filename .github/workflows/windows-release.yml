@@ -26,12 +26,12 @@ jobs:
       WORLDCRAFT_PUBLISHER_NAME: ${{ vars.WORLDCRAFT_PUBLISHER_NAME }}
       WORLDCRAFT_LEGAL_NAME: ${{ vars.WORLDCRAFT_LEGAL_NAME }}
       WORLDCRAFT_CERTIFICATE_PUBLISHER: ${{ vars.WORLDCRAFT_CERTIFICATE_PUBLISHER }}
-      WORLDCRAFT_HOMEPAGE: ${{ vars.WORLDCRAFT_HOMEPAGE }}
-      WORLDCRAFT_SUPPORT_URL: ${{ vars.WORLDCRAFT_SUPPORT_URL }}
-      WORLDCRAFT_PRIVACY_URL: ${{ vars.WORLDCRAFT_PRIVACY_URL }}
-      WORLDCRAFT_TERMS_URL: ${{ vars.WORLDCRAFT_TERMS_URL }}
-      WORLDCRAFT_UPDATE_STABLE_URL: ${{ vars.WORLDCRAFT_UPDATE_STABLE_URL }}
-      WORLDCRAFT_UPDATE_CANDIDATE_URL: ${{ vars.WORLDCRAFT_UPDATE_CANDIDATE_URL }}
+      WORLDCRAFT_HOMEPAGE: ${{ vars.WORLDCRAFT_HOMEPAGE || 'https://tayllisun.github.io/worldcraft-codex-releases/' }}
+      WORLDCRAFT_SUPPORT_URL: ${{ vars.WORLDCRAFT_SUPPORT_URL || 'https://github.com/TaylliSun/worldcraft-codex-releases/issues' }}
+      WORLDCRAFT_PRIVACY_URL: ${{ vars.WORLDCRAFT_PRIVACY_URL || 'https://tayllisun.github.io/worldcraft-codex-releases/privacy.html' }}
+      WORLDCRAFT_TERMS_URL: ${{ vars.WORLDCRAFT_TERMS_URL || 'https://tayllisun.github.io/worldcraft-codex-releases/terms.html' }}
+      WORLDCRAFT_UPDATE_STABLE_URL: ${{ vars.WORLDCRAFT_UPDATE_STABLE_URL || 'https://tayllisun.github.io/worldcraft-codex-releases/updates/stable/' }}
+      WORLDCRAFT_UPDATE_CANDIDATE_URL: ${{ vars.WORLDCRAFT_UPDATE_CANDIDATE_URL || 'https://tayllisun.github.io/worldcraft-codex-releases/updates/candidate/' }}
       WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
       WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       GH_TOKEN: ${{ github.token }}

@@ -513,7 +513,7 @@ async function verifyHealthy(page) {
 
 async function openEntityFromSearch(page, title) {
   await page.locator(".rail-search").click();
-  const search = page.getByRole("textbox", { name: "全局搜索" });
+  const search = page.getByRole("combobox", { name: "全局搜索" });
   await search.fill(title);
   await page.getByRole("dialog").getByText(title, { exact: true }).first().waitFor();
   await search.press("Enter");
@@ -580,15 +580,28 @@ async function verifyKeyboardAndIme(page) {
   );
 
   const searchTrigger = page.locator(".rail-search");
+  check((await searchTrigger.getAttribute("title"))?.includes("Ctrl+K"), true, "global search tooltip exposes its keyboard shortcut");
   await searchTrigger.click();
   const searchDialog = page.getByRole("dialog", { name: "搜索 苍岚纪", exact: true });
-  const searchInput = searchDialog.getByRole("textbox", { name: "全局搜索" });
+  const searchInput = searchDialog.getByRole("combobox", { name: "全局搜索" });
   await searchDialog.waitFor();
   await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "全局搜索");
   check(
     await searchInput.evaluate((element) => document.activeElement === element),
     true,
     "global search focuses its search field"
+  );
+  check(await searchInput.getAttribute("aria-controls"), "global-search-results", "global search connects its input to the result list");
+  for (let index = 0; index < 25; index += 1) await searchInput.press("ArrowDown");
+  const activeSearchResult = searchDialog.locator(".global-search-result[aria-selected='true']");
+  check(
+    await activeSearchResult.evaluate((element) => {
+      const item = element.getBoundingClientRect();
+      const list = element.parentElement.getBoundingClientRect();
+      return item.top >= list.top && item.bottom <= list.bottom;
+    }),
+    true,
+    "keyboard navigation keeps the active search result in view"
   );
   await page.keyboard.press("Escape");
   await searchDialog.waitFor({ state: "detached" });
@@ -597,6 +610,10 @@ async function verifyKeyboardAndIme(page) {
     true,
     "global search restores focus to its trigger"
   );
+  await page.keyboard.press("Control+k");
+  await searchDialog.waitFor();
+  check(await searchDialog.isVisible(), true, "Ctrl+K opens global search");
+  await page.keyboard.press("Escape");
 }
 
 async function verifyG2Workflows(page) {
@@ -1843,6 +1860,22 @@ async function verifyG2Workflows(page) {
   check(await page.locator(".map-minimap > img").count(), 2, "minimap composes the map background and image layers together");
   await page.getByLabel("图层图片混合模式", { exact: true }).selectOption("multiply");
   await page.getByLabel("图层图片透明度", { exact: true }).fill("0.45");
+  await page.getByLabel("图层图片横向位置", { exact: true }).fill("180");
+  await page.waitForFunction(() => Number(
+    document.querySelector("[aria-label='地图缩略导航']")?.getAttribute("data-navigation-right") ?? 0
+  ) > 200);
+  const infiniteMinimapState = await page.getByRole("button", { name: "地图缩略导航", exact: true }).evaluate(
+    (element) => ({
+      imageLeft: Number.parseFloat(element.querySelector(".map-minimap-layer-image")?.style.left ?? "0"),
+      navigationRight: Number(element.getAttribute("data-navigation-right") ?? 0)
+    })
+  );
+  check(infiniteMinimapState.navigationRight > 200, true, "minimap expands beyond the base map for off-canvas image layers");
+  check(
+    infiniteMinimapState.imageLeft > 0 && infiniteMinimapState.imageLeft < 100,
+    true,
+    "off-canvas image layers remain visible and navigable in the minimap"
+  );
   await page.getByLabel("图层图片横向位置", { exact: true }).fill("18");
   await page.getByLabel("图层图片纵向位置", { exact: true }).fill("-6");
   await page.getByLabel("图层图片缩放比例", { exact: true }).fill("70");

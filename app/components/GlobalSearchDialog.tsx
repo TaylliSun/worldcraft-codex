@@ -119,6 +119,7 @@ export function GlobalSearchDialog({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const activeResultRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const [activeKind, setActiveKind] = useState<GlobalSearchKind | "all">("all");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -195,6 +196,11 @@ export function GlobalSearchDialog({
   useEffect(() => {
     setActiveIndex(0);
   }, [activeKind, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    activeResultRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -283,8 +289,13 @@ export function GlobalSearchDialog({
           <Search size={20} />
           <input
             ref={inputRef}
+            aria-activedescendant={visibleResults[activeIndex] ? `global-search-result-${activeIndex}` : undefined}
             aria-label="全局搜索"
+            aria-controls="global-search-results"
+            aria-expanded="true"
+            aria-haspopup="listbox"
             placeholder={`搜索 ${worldName} 中的全部内容`}
+            role="combobox"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
@@ -326,14 +337,16 @@ export function GlobalSearchDialog({
           <strong>{visibleResults.length}</strong>
         </div>
 
-        <div className="global-search-results" role="listbox">
+        <div className="global-search-results" id="global-search-results" role="listbox">
           {visibleResults.length ? (
             visibleResults.map((result, index) => {
               const Icon = result.icon ?? kindMeta[result.kind].icon;
               return (
                 <button
+                  ref={index === activeIndex ? activeResultRef : undefined}
                   aria-selected={index === activeIndex}
                   className={`global-search-result ${index === activeIndex ? "is-active" : ""}`}
+                  id={`global-search-result-${index}`}
                   key={result.key}
                   role="option"
                   type="button"

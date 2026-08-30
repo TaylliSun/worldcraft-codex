@@ -109,19 +109,37 @@ async function main() {
       ["松墨", "forest"]
     ];
     const observedBackgrounds = new Set([initialBackground]);
+    const observedAccents = new Set();
+    const themeSurfaceScreenshots = [];
 
     for (const [label, id] of themes) {
       await selectTheme(page, label, id);
-      observedBackgrounds.add(await page.locator(".workspace").evaluate(
-        (element) => getComputedStyle(element).backgroundColor
-      ));
+      const palette = await page.evaluate(() => {
+        const workspace = getComputedStyle(document.querySelector(".workspace"));
+        const primaryAction = getComputedStyle(document.querySelector(".author-quick-actions button:first-child"));
+        return {
+          accent: getComputedStyle(document.querySelector(".app-shell")).getPropertyValue("--theme-accent").trim(),
+          actionBackground: primaryAction.backgroundColor,
+          actionText: primaryAction.color,
+          background: workspace.backgroundColor,
+          foreground: workspace.color
+        };
+      });
+      observedBackgrounds.add(palette.background);
+      observedAccents.add(palette.accent);
+      assert.ok(contrastRatio(palette.background, palette.foreground) >= 7, `${id} workspace text remains readable`);
+      assert.ok(contrastRatio(palette.actionBackground, palette.actionText) >= 4.5, `${id} primary action remains readable`);
       assert.equal(
         await page.evaluate(() => localStorage.getItem("worldcraft-codex-app-theme-v1")),
         id
       );
+      const screenshotPath = path.join(runRoot, `theme-${id}-surface.png`);
+      themeSurfaceScreenshots.push(screenshotPath);
+      await page.screenshot({ path: screenshotPath, animations: "disabled" });
     }
 
     assert.equal(observedBackgrounds.size, 5, "each theme should expose a distinct workspace surface");
+    assert.equal(observedAccents.size, 5, "each theme should expose a distinct accent color");
 
     await selectTheme(page, "夜航", "night");
     const nightColors = await page.evaluate(() => {
@@ -187,6 +205,29 @@ async function main() {
     await page.getByRole("button", { name: "AI 工具", exact: true }).click();
     await page.locator(".ai-workspace").waitFor({ state: "visible" });
     assert.deepEqual(await findLargeWhiteSurfaces(page), []);
+    const aiOperatorColors = await page.evaluate(() => {
+      const background = getComputedStyle(document.querySelector(".ai-operator-layout")).backgroundColor;
+      const color = (selector) => getComputedStyle(document.querySelector(selector)).color;
+      const disabledRun = getComputedStyle(document.querySelector(".ai-operator-run"));
+      return {
+        background,
+        disabledRunBackground: disabledRun.backgroundColor,
+        disabledRunText: disabledRun.color,
+        empty: color(".ai-operator-empty"),
+        inputLabel: color(".ai-operator-input > span"),
+        status: color(".ai-operator-status span")
+      };
+    });
+    for (const key of ["empty", "inputLabel", "status"]) {
+      assert.ok(
+        contrastRatio(aiOperatorColors.background, aiOperatorColors[key]) >= 4.5,
+        `night AI operator ${key} remains readable`
+      );
+    }
+    assert.ok(
+      contrastRatio(aiOperatorColors.disabledRunBackground, aiOperatorColors.disabledRunText) >= 4.5,
+      "night AI operator disabled action remains readable"
+    );
     await page.screenshot({
       path: path.join(runRoot, "theme-night-ai.png"),
       animations: "disabled"
@@ -356,6 +397,7 @@ async function main() {
       themes: themes.map(([, id]) => id),
       nightContrast: contrastRatio(nightColors.background, nightColors.foreground),
       screenshots: [
+        ...themeSurfaceScreenshots,
         path.join(runRoot, "theme-night-author.png"),
         path.join(runRoot, "theme-night.png"),
         path.join(runRoot, "theme-night-ai.png"),

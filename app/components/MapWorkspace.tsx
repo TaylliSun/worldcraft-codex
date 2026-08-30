@@ -516,6 +516,52 @@ function getMapImageBounds(points: MapPoint[]): MapImageBounds {
   };
 }
 
+function getPaddedMapBounds(points: MapPoint[]): MapImageBounds {
+  const bounds = getMapImageBounds(points.length ? points : [{ x: 0, y: 0 }, { x: 100, y: 100 }]);
+  const width = Math.max(1, bounds.right - bounds.left);
+  const height = Math.max(1, bounds.bottom - bounds.top);
+  const paddingX = Math.max(2, width * 0.04);
+  const paddingY = Math.max(2, height * 0.04);
+  return getMapImageBounds([
+    { x: bounds.left - paddingX, y: bounds.top - paddingY },
+    { x: bounds.right + paddingX, y: bounds.bottom + paddingY }
+  ]);
+}
+
+function getMinimapRectStyle(
+  navigationBounds: MapImageBounds,
+  bounds: Pick<MapImageBounds, "bottom" | "left" | "right" | "top">
+): CSSProperties {
+  const navigationWidth = Math.max(1, navigationBounds.right - navigationBounds.left);
+  const navigationHeight = Math.max(1, navigationBounds.bottom - navigationBounds.top);
+  return {
+    height: `${((bounds.bottom - bounds.top) / navigationHeight) * 100}%`,
+    left: `${((bounds.left - navigationBounds.left) / navigationWidth) * 100}%`,
+    top: `${((bounds.top - navigationBounds.top) / navigationHeight) * 100}%`,
+    width: `${((bounds.right - bounds.left) / navigationWidth) * 100}%`
+  };
+}
+
+function getMinimapImageFrameStyle(
+  map: Pick<WorldMap, "height" | "width">,
+  naturalSize: MapImageNaturalSize | undefined,
+  transform: MapImageTransform,
+  navigationBounds: MapImageBounds
+): CSSProperties {
+  const size = getContainedMapImagePercentSize(map, naturalSize);
+  const navigationWidth = Math.max(1, navigationBounds.right - navigationBounds.left);
+  const navigationHeight = Math.max(1, navigationBounds.bottom - navigationBounds.top);
+  const scaleX = transform.scale * (transform.flipX ? -1 : 1);
+  const scaleY = transform.scale * (transform.flipY ? -1 : 1);
+  return {
+    height: `${(size.height / navigationHeight) * 100}%`,
+    left: `${((50 + transform.x - navigationBounds.left) / navigationWidth) * 100}%`,
+    top: `${((50 + transform.y - navigationBounds.top) / navigationHeight) * 100}%`,
+    transform: `translate(-50%, -50%) rotate(${transform.rotation}deg) scale(${scaleX}, ${scaleY})`,
+    width: `${(size.width / navigationWidth) * 100}%`
+  };
+}
+
 const markerKindMeta: Record<
   MapMarkerKind,
   { label: string; icon: typeof MapPin }
@@ -1307,31 +1353,14 @@ export function MapWorkspace({
     setOffset(nextOffset);
   }
 
-  const fitToView = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport || !activeMap) return;
-    const availableWidth = Math.max(120, viewport.clientWidth - 28);
-    const availableHeight = Math.max(120, viewport.clientHeight - 28);
-    const nextZoom = clamp(
-      Math.min(availableWidth / activeMap.width, availableHeight / activeMap.height),
-      MIN_MAP_ZOOM,
-      MAX_MAP_ZOOM
-    );
-    updateView(nextZoom, {
-      x: Math.round((viewport.clientWidth - activeMap.width * nextZoom) / 2),
-      y: Math.round((viewport.clientHeight - activeMap.height * nextZoom) / 2)
-    });
-  }, [activeMap?.height, activeMap?.id, activeMap?.width]);
-
-  function fitContentToView() {
-    const viewport = viewportRef.current;
-    if (!viewport || !activeMap) return;
+  function getVisibleMapContentPoints(): MapPoint[] {
+    if (!activeMap) return [];
     const routePoints = visibleActiveRoutes.flatMap((route) =>
       route.stops
         .map((stop) => markerMap.get(stop.markerId))
         .filter((marker): marker is MapMarker => Boolean(marker))
     );
-    const points: MapPoint[] = [
+    return [
       { x: 0, y: 0 },
       { x: 100, y: 100 },
       ...(activeMap.imageUrl
@@ -1361,6 +1390,39 @@ export function MapWorkspace({
       ...(regionDraftCursor ? [regionDraftCursor] : []),
       ...(measurement ? [measurement.start, measurement.end] : [])
     ];
+  }
+
+  function getMinimapNavigationBounds() {
+    const points = getVisibleMapContentPoints();
+    if (exportViewportBounds) {
+      points.push(
+        { x: exportViewportBounds.left, y: exportViewportBounds.top },
+        { x: exportViewportBounds.right, y: exportViewportBounds.bottom }
+      );
+    }
+    return getPaddedMapBounds(points);
+  }
+
+  const fitToView = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !activeMap) return;
+    const availableWidth = Math.max(120, viewport.clientWidth - 28);
+    const availableHeight = Math.max(120, viewport.clientHeight - 28);
+    const nextZoom = clamp(
+      Math.min(availableWidth / activeMap.width, availableHeight / activeMap.height),
+      MIN_MAP_ZOOM,
+      MAX_MAP_ZOOM
+    );
+    updateView(nextZoom, {
+      x: Math.round((viewport.clientWidth - activeMap.width * nextZoom) / 2),
+      y: Math.round((viewport.clientHeight - activeMap.height * nextZoom) / 2)
+    });
+  }, [activeMap?.height, activeMap?.id, activeMap?.width]);
+
+  function fitContentToView() {
+    const viewport = viewportRef.current;
+    if (!viewport || !activeMap) return;
+    const points = getVisibleMapContentPoints();
     const minimumX = Math.min(...points.map((point) => point.x));
     const maximumX = Math.max(...points.map((point) => point.x));
     const minimumY = Math.min(...points.map((point) => point.y));
@@ -3091,9 +3153,12 @@ export function MapWorkspace({
 
   function handleMinimapClick(event: MouseEvent<HTMLButtonElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
+    const navigationBounds = getMinimapNavigationBounds();
+    const navigationWidth = navigationBounds.right - navigationBounds.left;
+    const navigationHeight = navigationBounds.bottom - navigationBounds.top;
     centerMapPoint(
-      ((event.clientX - bounds.left) / bounds.width) * 100,
-      ((event.clientY - bounds.top) / bounds.height) * 100
+      navigationBounds.left + ((event.clientX - bounds.left) / bounds.width) * navigationWidth,
+      navigationBounds.top + ((event.clientY - bounds.top) / bounds.height) * navigationHeight
     );
   }
 
@@ -4223,25 +4288,29 @@ export function MapWorkspace({
     ? activeRegions.findIndex((region) => region.id === selectedRegion.id)
     : -1;
 
-  const minimapViewportWidth = clamp(
-    (viewportSize.width / Math.max(1, activeMap.width * zoom)) * 100,
-    4,
-    100
+  const minimapNavigationBounds = getMinimapNavigationBounds();
+  const minimapNavigationWidth = Math.max(
+    1,
+    minimapNavigationBounds.right - minimapNavigationBounds.left
   );
-  const minimapViewportHeight = clamp(
-    (viewportSize.height / Math.max(1, activeMap.height * zoom)) * 100,
-    4,
-    100
+  const minimapNavigationHeight = Math.max(
+    1,
+    minimapNavigationBounds.bottom - minimapNavigationBounds.top
   );
-  const minimapViewportLeft = clamp(
-    (-offset.x / Math.max(1, activeMap.width * zoom)) * 100,
-    0,
-    100 - minimapViewportWidth
-  );
-  const minimapViewportTop = clamp(
-    (-offset.y / Math.max(1, activeMap.height * zoom)) * 100,
-    0,
-    100 - minimapViewportHeight
+  const minimapMapBoundsStyle = getMinimapRectStyle(minimapNavigationBounds, {
+    bottom: 100,
+    left: 0,
+    right: 100,
+    top: 0
+  });
+  const minimapViewportStyle = exportViewportBounds
+    ? getMinimapRectStyle(minimapNavigationBounds, exportViewportBounds)
+    : minimapMapBoundsStyle;
+  const minimapAspectRatio = clamp(
+    (activeMap.width * minimapNavigationWidth) /
+      Math.max(1, activeMap.height * minimapNavigationHeight),
+    0.75,
+    2
   );
 
   return (
@@ -5986,19 +6055,33 @@ export function MapWorkspace({
               aria-label="地图缩略导航"
               className="map-minimap"
               data-map-interactive="true"
-              style={{ aspectRatio: `${activeMap.width} / ${activeMap.height}` }}
+              data-navigation-bottom={Number(minimapNavigationBounds.bottom.toFixed(2))}
+              data-navigation-left={Number(minimapNavigationBounds.left.toFixed(2))}
+              data-navigation-right={Number(minimapNavigationBounds.right.toFixed(2))}
+              data-navigation-top={Number(minimapNavigationBounds.top.toFixed(2))}
+              style={{ aspectRatio: minimapAspectRatio }}
               title="点击缩略图定位地图"
               type="button"
               onClick={handleMinimapClick}
             >
+              <span
+                aria-hidden="true"
+                className="map-minimap-map-bounds"
+                style={minimapMapBoundsStyle}
+              />
               {activeMap.imageUrl ? (
                 <img
                   alt=""
                   draggable={false}
                   src={activeMap.imageUrl}
-                  style={getMapImageTransformStyle(activeMap.imageTransform)}
+                  style={getMinimapImageFrameStyle(
+                    activeMap,
+                    imageNaturalSizes[activeMap.imageUrl],
+                    activeMap.imageTransform,
+                    minimapNavigationBounds
+                  )}
                 />
-              ) : <span className="map-minimap-generated" />}
+              ) : <span className="map-minimap-generated" style={minimapMapBoundsStyle} />}
               {activeLayers
                 .filter(
                   (layer) => layer.visible
@@ -6014,13 +6097,22 @@ export function MapWorkspace({
                     key={layer.id}
                     src={layer.imageUrl}
                     style={{
-                      ...getMapImageTransformStyle(layer.imageTransform),
+                      ...getMinimapImageFrameStyle(
+                        activeMap,
+                        imageNaturalSizes[layer.imageUrl],
+                        layer.imageTransform,
+                        minimapNavigationBounds
+                      ),
                       mixBlendMode: layer.imageBlendMode,
                       opacity: layer.imageOpacity
                     }}
                   />
                 ))}
-              <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <svg
+                aria-hidden="true"
+                preserveAspectRatio="none"
+                viewBox={`${minimapNavigationBounds.left} ${minimapNavigationBounds.top} ${minimapNavigationWidth} ${minimapNavigationHeight}`}
+              >
                 {visibleActiveRegions
                   .filter((region) => region.points.length >= 3)
                   .map((region) => (
@@ -6044,18 +6136,17 @@ export function MapWorkspace({
                 <i
                   aria-hidden="true"
                   key={marker.id}
-                  style={{ background: marker.color, left: `${marker.x}%`, top: `${marker.y}%` }}
+                  style={{
+                    background: marker.color,
+                    left: `${((marker.x - minimapNavigationBounds.left) / minimapNavigationWidth) * 100}%`,
+                    top: `${((marker.y - minimapNavigationBounds.top) / minimapNavigationHeight) * 100}%`
+                  }}
                 />
               ))}
               <span
                 aria-hidden="true"
                 className="map-minimap-viewport"
-                style={{
-                  height: `${minimapViewportHeight}%`,
-                  left: `${minimapViewportLeft}%`,
-                  top: `${minimapViewportTop}%`,
-                  width: `${minimapViewportWidth}%`
-                }}
+                style={minimapViewportStyle}
               />
             </button>
           </div>
